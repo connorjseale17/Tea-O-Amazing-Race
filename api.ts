@@ -20,14 +20,17 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const RACERS_COLLECTION = 'racers';
+
+// UPDATED: Pointing to the specific race document provided
+// Structure: teaodata (Collection) -> 35c...(Doc) -> racers (Subcollection)
+const RACERS_COLLECTION = 'teaodata/35cLoZSnLe5GRSNsEui4/racers';
+
 const LOCAL_STORAGE_KEY = 'tea_o_race_data';
 
-// State to track if we are using fallback mode due to errors
-let usingFallback = false;
 // Internal listener queue
 const listeners: ((users: User[], isOnline: boolean) => void)[] = [];
 let unsubscribeSnapshot: (() => void) | null = null;
+let isOfflineMode = false;
 
 // --- LOCAL STORAGE HELPERS ---
 const getLocalUsers = (): User[] => {
@@ -52,7 +55,7 @@ const startSnapshotListener = () => {
   unsubscribeSnapshot = onSnapshot(q, 
     (snapshot) => {
       // Success! Connection is live.
-      usingFallback = false;
+      isOfflineMode = false;
       const users = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -66,7 +69,7 @@ const startSnapshotListener = () => {
     }, 
     (error) => {
       console.warn("Firebase Error (Switching to Offline Mode):", error.message);
-      usingFallback = true;
+      isOfflineMode = true;
       
       // If we failed, serve local data immediately
       const localData = getLocalUsers();
@@ -84,31 +87,26 @@ export const api = {
     if (listeners.length === 1) {
       startSnapshotListener();
     } else {
-       // If already connected/fallback, give current state immediately
-       // We can't easily know current data without tracking it, 
-       // so simple fetch:
-       if (usingFallback) {
+       // Send immediate cached response
+       if (isOfflineMode) {
          callback(getLocalUsers(), false);
-       } else {
-         // Let the next snapshot update handle it, or we could fetch? 
-         // onSnapshot usually fires immediately with cached data if available.
-       }
+       } 
     }
 
     return () => {
       const idx = listeners.indexOf(callback);
       if (idx !== -1) listeners.splice(idx, 1);
-      // If no listeners left, we could unsubscribe, but keeping it open is fine for this app
     };
   },
 
   // Manual Retry
   retryConnection() {
-    usingFallback = false;
+    isOfflineMode = false;
     startSnapshotListener();
   },
 
   // Create a new user
+  // WE ALWAYS TRY FIREBASE FIRST NOW, REGARDLESS OF PREVIOUS STATUS
   async addUser(name: string, teamName: string, iconId: string): Promise<User | null> {
     const newUserBase = {
       name,
@@ -118,84 +116,97 @@ export const api = {
       stepHistory: [],
     };
 
-    if (!usingFallback) {
-      try {
-        const docRef = await addDoc(collection(db, RACERS_COLLECTION), {
-          ...newUserBase,
-          createdAt: serverTimestamp()
-        });
-        return { id: docRef.id, ...newUserBase } as User;
-      } catch (e) {
-        console.warn("Firebase Write Failed, switching to fallback");
-        usingFallback = true;
+    try {
+      const docRef = await addDoc(collection(db, RACERS_COLLECTION), {
+        ...newUserBase,
+        createdAt: serverTimestamp()
+      });
+      
+      // If we get here, Firebase is working! Reset offline mode if it was set.
+      if (isOfflineMode) {
+        isOfflineMode = false;
+        startSnapshotListener();
       }
+      
+      return { id: docRef.id, ...newUserBase } as User;
+    } catch (e) {
+      console.warn("Firebase Write Failed, switching to fallback", e);
+      isOfflineMode = true;
+      
+      // Fallback Implementation
+      const localUsers = getLocalUsers();
+      const newUser = { 
+        ...newUserBase, 
+        id: `local-${Date.now()}`,
+        createdAt: new Date().toISOString()
+      };
+      localUsers.push(newUser);
+      saveLocalUsers(localUsers);
+      return newUser;
     }
-
-    // Fallback Implementation
-    const localUsers = getLocalUsers();
-    const newUser = { 
-      ...newUserBase, 
-      id: `local-${Date.now()}`,
-      createdAt: new Date().toISOString()
-    };
-    localUsers.push(newUser);
-    saveLocalUsers(localUsers);
-    return newUser;
   },
 
   // Add steps to an existing user
   async addSteps(userId: string, steps: number): Promise<User | null> {
-    if (!usingFallback) {
-      try {
-        const userRef = doc(db, RACERS_COLLECTION, userId);
-        
-        await updateDoc(userRef, {
-          steps: increment(steps),
-          stepHistory: arrayUnion({
-            amount: steps,
-            date: new Date().toISOString()
-          }),
-          lastUpdated: serverTimestamp()
-        });
-        
-        return { id: userId } as User; 
-      } catch (e) {
-        console.warn("Firebase Write Failed, switching to fallback");
-        usingFallback = true;
-      }
-    }
-
-    // Fallback Implementation
-    const localUsers = getLocalUsers();
-    const user = localUsers.find(u => u.id === userId);
-    if (user) {
-      user.steps += steps;
-      if (!user.stepHistory) user.stepHistory = [];
-      user.stepHistory.push({
-        amount: steps,
-        date: new Date().toISOString()
+    try {
+      const userRef = doc(db, RACERS_COLLECTION, userId);
+      
+      await updateDoc(userRef, {
+        steps: increment(steps),
+        stepHistory: arrayUnion({
+          amount: steps,
+          date: new Date().toISOString()
+        }),
+        lastUpdated: serverTimestamp()
       });
-      saveLocalUsers(localUsers);
-      return user;
+      
+      // Heal connection if needed
+      if (isOfflineMode) {
+        isOfflineMode = false;
+        startSnapshotListener();
+      }
+
+      return { id: userId } as User; 
+    } catch (e) {
+      console.warn("Firebase Write Failed, switching to fallback", e);
+      isOfflineMode = true;
+      
+      // Fallback Implementation
+      const localUsers = getLocalUsers();
+      const user = localUsers.find(u => u.id === userId);
+      if (user) {
+        user.steps += steps;
+        if (!user.stepHistory) user.stepHistory = [];
+        user.stepHistory.push({
+          amount: steps,
+          date: new Date().toISOString()
+        });
+        saveLocalUsers(localUsers);
+        return user;
+      }
+      return null;
     }
-    return null;
   },
 
   // Delete a user
   async deleteUser(userId: string): Promise<boolean> {
-    if (!usingFallback) {
-      try {
-        await deleteDoc(doc(db, RACERS_COLLECTION, userId));
-        return true;
-      } catch (e) {
-        usingFallback = true;
+    try {
+      await deleteDoc(doc(db, RACERS_COLLECTION, userId));
+      
+      if (isOfflineMode) {
+        isOfflineMode = false;
+        startSnapshotListener();
       }
+      
+      return true;
+    } catch (e) {
+      isOfflineMode = true;
+      
+      // Fallback Implementation
+      const localUsers = getLocalUsers();
+      const filtered = localUsers.filter(u => u.id !== userId);
+      saveLocalUsers(filtered);
+      return true;
     }
-
-    // Fallback Implementation
-    const localUsers = getLocalUsers();
-    const filtered = localUsers.filter(u => u.id !== userId);
-    saveLocalUsers(filtered);
-    return true;
   }
 };
