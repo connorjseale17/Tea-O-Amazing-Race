@@ -6,9 +6,6 @@ export const TOTAL_GOAL_MILES = 4195;
 export const TOTAL_GOAL_STEPS = TOTAL_GOAL_MILES * STEPS_PER_MILE;
 export const MAX_USERS = 20;
 
-// API Configuration
-export const API_URL = 'http://localhost:3001/api';
-
 // Route: Seattle -> SF -> LA -> Vegas -> Moab -> Denver -> Chicago -> Philly -> NYC
 export const ROUTE_WAYPOINTS: Waypoint[] = [
   {

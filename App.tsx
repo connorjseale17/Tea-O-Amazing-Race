@@ -7,7 +7,7 @@ import Leaderboard from './components/Leaderboard';
 import TimeBasedLeaderboard from './components/TimeBasedLeaderboard';
 import AddStepsForm from './components/AddStepsForm';
 import ReportGenerator from './components/ReportGenerator';
-import { MapPin, Globe, Navigation, WifiOff } from 'lucide-react';
+import { MapPin, Globe, Navigation, CloudOff, CloudLightning, RefreshCw } from 'lucide-react';
 import { api } from './api';
 
 const App: React.FC = () => {
@@ -15,7 +15,10 @@ const App: React.FC = () => {
   const [milestonesReached, setMilestonesReached] = useState<string[]>([]);
   const [activeNotification, setActiveNotification] = useState<Waypoint | null>(null);
   const [mapViewMode, setMapViewMode] = useState<'global' | 'local'>('global');
+  
+  // Status State
   const [isOffline, setIsOffline] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'live' | 'local'>('connecting');
 
   // Derived State
   const totalSteps = users.reduce((acc, user) => acc + user.steps, 0);
@@ -23,23 +26,22 @@ const App: React.FC = () => {
 
   // --- API INTEGRATION ---
 
-  // Load Users & Start Polling
+  // Real-time Subscription to Firebase
   useEffect(() => {
-    const fetchUsers = async () => {
-      const data = await api.getUsers();
-      if (data.length === 0 && users.length === 0) {
-        // If we get empty list repeatedly, it might mean server is down or just empty DB.
-        // We'll trust the API wrapper's error handling for "offline" detection if strictly needed,
-        // but for now, we just set state.
-      }
-      setUsers(data);
-    };
+    // API now returns (users, isOnline)
+    const unsubscribe = api.subscribeToUsers((data, isOnline) => {
+       setUsers(data);
+       if (isOnline) {
+         setConnectionStatus('live');
+         setIsOffline(false);
+       } else {
+         setConnectionStatus('local');
+         setIsOffline(true);
+       }
+    });
 
-    fetchUsers(); // Initial fetch
-    
-    // Poll every 3 seconds for live updates
-    const intervalId = setInterval(fetchUsers, 3000);
-    return () => clearInterval(intervalId);
+    // Cleanup listener on unmount
+    return () => unsubscribe();
   }, []);
 
   // Milestone Logic (Client-side calculation based on fetched data)
@@ -50,8 +52,6 @@ const App: React.FC = () => {
         const requiredProgress = index * segmentSize; 
         
         // Only trigger if we are past the point AND it hasn't been triggered locally this session
-        // Note: For a real persistent milestone system, we'd store 'milestones' in the DB too.
-        // For now, we keep milestones local to the session view to avoid spamming alerts on reload.
         if (progressPercentage >= requiredProgress && index > 0 && !milestonesReached.includes(wp.name)) {
              setMilestonesReached(prev => [...prev, wp.name]);
              setActiveNotification(wp);
@@ -60,52 +60,28 @@ const App: React.FC = () => {
   }, [progressPercentage, milestonesReached]);
 
   // Handlers
+  const handleRetryConnection = () => {
+    setConnectionStatus('connecting');
+    api.retryConnection();
+  };
+
   const handleAddSteps = async (userId: string, steps: number) => {
     // Optimistic Update
-    const previousUsers = [...users];
-    
-    // We update local state immediately for responsiveness, though stepHistory isn't fully updated until refresh
-    // This is fine for optimistic UI on the main total.
-    setUsers(users.map(u => u.id === userId ? { ...u, steps: u.steps + steps } : u));
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, steps: u.steps + steps } : u));
 
     // API Call
-    const updatedUser = await api.addSteps(userId, steps);
-    
-    if (!updatedUser) {
-      // Revert if failed
-      setUsers(previousUsers);
-      setIsOffline(true);
-      setTimeout(() => setIsOffline(false), 3000);
-    }
+    await api.addSteps(userId, steps);
   };
 
   const handleAddUser = async (name: string, teamName: string, iconId: string) => {
     if (users.length >= MAX_USERS) return;
-
-    // API Call
-    const newUser = await api.addUser(name, teamName, iconId);
-    
-    if (newUser) {
-      setUsers(prev => [...prev, newUser]);
-    } else {
-      setIsOffline(true);
-      setTimeout(() => setIsOffline(false), 3000);
-    }
+    await api.addUser(name, teamName, iconId);
   };
 
   const handleRemoveUser = async (userId: string) => {
     if (!window.confirm("Are you sure you want to remove this racer? This cannot be undone.")) return;
-
-    // Optimistic Update
-    const previousUsers = [...users];
     setUsers(users.filter(u => u.id !== userId));
-
-    const success = await api.deleteUser(userId);
-    if (!success) {
-      setUsers(previousUsers); // Revert
-      setIsOffline(true);
-      setTimeout(() => setIsOffline(false), 3000);
-    }
+    await api.deleteUser(userId);
   };
 
   const closeNotification = () => setActiveNotification(null);
@@ -114,11 +90,17 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-[#f8f9fa] text-gray-900 p-4 md:p-8 pb-32 font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Connection Error Toast */}
+        {/* Connection Error Toast - Only show if we expected live but got local */}
         {isOffline && (
-          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-500 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 animate-bounce-in">
-             <WifiOff size={20} />
-             <span>Server unreachable. Check backend connection.</span>
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-gray-800 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 animate-bounce-in border border-gray-700">
+             <CloudOff size={20} className="text-gray-400" />
+             <span className="text-sm">Offline Mode</span>
+             <button 
+                onClick={handleRetryConnection}
+                className="ml-2 bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"
+             >
+                <RefreshCw size={12} /> RETRY
+             </button>
           </div>
         )}
 
@@ -130,10 +112,32 @@ const App: React.FC = () => {
             </h1>
             <p className="text-gray-500 mt-1 font-medium">Seattle to NYC • 4,195 Miles</p>
           </div>
-          <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-full border border-green-100">
-            <span className="w-2 h-2 bg-[#34A853] rounded-full animate-pulse"></span>
-            <span className="text-sm font-bold text-[#34A853]">LIVE DATABASE</span>
-          </div>
+          
+          {/* Status Badge */}
+          {connectionStatus === 'live' && (
+            <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-full border border-green-100 transition-colors">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <span className="text-sm font-bold text-[#34A853]">LIVE SYNC</span>
+            </div>
+          )}
+          
+          {connectionStatus === 'local' && (
+             <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full border border-gray-200 transition-colors">
+              <CloudOff size={16} className="text-gray-500" />
+              <span className="text-sm font-bold text-gray-500">OFFLINE</span>
+            </div>
+          )}
+
+           {connectionStatus === 'connecting' && (
+             <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-full border border-blue-100 transition-colors">
+              <CloudLightning size={16} className="text-blue-500 animate-pulse" />
+              <span className="text-sm font-bold text-blue-500">CONNECTING...</span>
+            </div>
+          )}
+
         </header>
 
         {/* Milestone Modal */}
@@ -195,7 +199,7 @@ const App: React.FC = () => {
            <Leaderboard users={users} />
         </div>
 
-        {/* Weekly / Monthly Momentum Leaderboard - NEW SECTION */}
+        {/* Weekly / Monthly Momentum Leaderboard */}
         <div>
           <TimeBasedLeaderboard users={users} />
         </div>
