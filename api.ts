@@ -21,10 +21,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// UPDATED: Pointing to the specific race document provided
-// Structure: teaodata (Collection) -> 35c...(Doc) -> racers (Subcollection)
-const RACERS_COLLECTION = 'teaodata/35cLoZSnLe5GRSNsEui4/racers';
-
+// Reverted to standard root collection 'racers' for reliability
+const RACERS_COLLECTION = 'racers';
 const LOCAL_STORAGE_KEY = 'tea_o_race_data';
 
 // Internal listener queue
