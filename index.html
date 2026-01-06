@@ -20,15 +20,17 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <!-- React & Babel -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <!-- Import Map for Modules -->
     <script type="importmap">
     {
       "imports": {
-        "lucide-react": "https://esm.sh/lucide-react@0.263.1?bundle",
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1",
         "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
         "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
       }
@@ -64,7 +66,7 @@
             Plus, Check, UserPlus, X, Trash2, Zap, Star, Heart, Trophy, Crown, Smile, 
             Ghost, Cat, Dog, Fish, Bird, Bug, Flower, TreePine, Sun, Moon, Cloud, Flame, 
             Droplets, Rocket, Calendar, History, Award, ArrowDown, Users, BarChart2, Eye, EyeOff,
-            ClipboardCopy, Download
+            ClipboardCopy, Download, TrendingUp, Clock
         } from 'lucide-react';
         import { initializeApp } from 'firebase/app';
         import { 
@@ -129,7 +131,7 @@
             return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lng];
         }
 
-        // --- API ---
+        // --- API & FIREBASE ---
         const firebaseConfig = {
           apiKey: "AIzaSyBscaY5kkaXkea9ZFoMeqYNvmCnVEVeTfs",
           authDomain: "tea-and-o-amazing-race.firebaseapp.com",
@@ -152,6 +154,7 @@
           try {
             const data = localStorage.getItem(LOCAL_STORAGE_KEY);
             const users = data ? JSON.parse(data) : [];
+            // Sanitize data (robustness against bad entries)
             return users.map(u => ({
               ...u,
               steps: typeof u.steps === 'number' ? u.steps : 0,
@@ -476,9 +479,9 @@
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
-                {leaders.length === 0 ? <div className="col-span-full py-12 text-center text-gray-400">No activity recorded for this period.</div> : leaders.map((user, index) => (
+                {leaders.length === 0 ? <div className="col-span-full py-12 text-center text-gray-400"><Clock className="mx-auto mb-2 opacity-50"/>No activity recorded for this period.</div> : leaders.map((user, index) => (
                   <div key={user.id} className={`flex flex-col items-center p-4 rounded-2xl border ${index === 0 ? 'bg-gradient-to-b from-white to-gray-50 border-gray-200 md:scale-105 z-10' : 'bg-white border-gray-100'}`}>
-                     {index === 0 && <div className="mb-2 bg-yellow-100 text-[#f59e0b] px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">LEADER</div>}
+                     {index === 0 && <div className="mb-2 bg-yellow-100 text-[#f59e0b] px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><TrendingUp size={12}/> LEADER</div>}
                      <div className="mb-2"><div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : index === 1 ? 'bg-gray-200 text-gray-700' : index === 2 ? 'bg-orange-100 text-orange-700' : 'bg-blue-50 text-blue-600'}`}>#{index + 1}</div></div>
                      <h3 className="font-bold text-gray-800 text-center leading-tight mb-1 truncate w-full">{getDisplayName(user)}</h3>
                      <p className={`text-xl font-roboto font-bold ${viewMode === 'overall' ? 'text-indigo-600' : 'text-purple-600'}`}>{user.currentScore.toLocaleString()}</p>
@@ -504,7 +507,7 @@
                 setSelectedUserIds(newSet);
             };
             const getDisplayName = (u) => u.teamName ? u.teamName : u.name;
-            const CHART_COLORS = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8E24AA', '#00ACC1', '#F4511E', '#3949AB'];
+            const CHART_COLORS = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8E24AA', '#00ACC1', '#F4511E', '#3949AB', '#D81B60', '#00897B'];
             const weeks = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
             const CHART_HEIGHT = 200, CHART_WIDTH = 800, PADDING_X = 40, PADDING_Y = 20;
 
@@ -546,11 +549,27 @@
                             {userPaths.map(p => <g key={`pts-${p.userId}`}>{p.points.map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={hoveredWeek === pt.week ? 6 : 3} fill="white" stroke={p.color} strokeWidth="2" style={{opacity: hoveredWeek !== null && hoveredWeek !== pt.week ? 0.1 : 1}}/>)}</g>)}
                             {weeks.map((w, i) => <rect key={`ov-${w}`} x={getX(i) - 20} y={0} width={40} height={CHART_HEIGHT} fill="transparent" className="cursor-crosshair hover:fill-gray-50/50" onMouseEnter={() => setHoveredWeek(w)} onMouseLeave={() => setHoveredWeek(null)}/>)}
                         </svg>
+                        {hoveredWeek !== null && (
+                            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm border border-gray-200 p-4 rounded-xl shadow-lg z-10 min-w-[200px] animate-fade-in pointer-events-none">
+                                <h4 className="text-gray-500 text-xs font-bold uppercase mb-2">Week {hoveredWeek} Stats</h4>
+                                <div className="space-y-1">
+                                    {sortedUsers.filter(u => selectedUserIds.has(u.id) && u.weeklySteps?.[hoveredWeek]).map((u, i) => (
+                                        <div key={u.id} className="flex items-center justify-between text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[sortedUsers.findIndex(su => su.id === u.id) % CHART_COLORS.length] }} />
+                                                <span className="text-gray-700 font-medium truncate max-w-[100px]">{getDisplayName(u)}</span>
+                                            </div>
+                                            <span className="font-mono font-bold text-gray-900">{(u.weeklySteps[hoveredWeek] || 0).toLocaleString()}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <div className="mt-8 border-t border-gray-100 pt-6 flex flex-wrap gap-2">
                         {sortedUsers.map((u, i) => {
                             const isSelected = selectedUserIds.has(u.id);
-                            return <button key={u.id} onClick={() => toggleUser(u.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${isSelected ? 'bg-white border-gray-200 text-gray-800' : 'bg-gray-50 border-transparent text-gray-400'}`}><div className={`w-2.5 h-2.5 rounded-full ${isSelected ? '' : 'bg-gray-300'}`} style={{ backgroundColor: isSelected ? CHART_COLORS[i % CHART_COLORS.length] : undefined }} />{getDisplayName(u)}</button>;
+                            return <button key={u.id} onClick={() => toggleUser(u.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${isSelected ? 'bg-white border-gray-200 text-gray-800 shadow-sm' : 'bg-gray-50 border-transparent text-gray-400'}`}><div className={`w-2.5 h-2.5 rounded-full ${isSelected ? '' : 'bg-gray-300'}`} style={{ backgroundColor: isSelected ? CHART_COLORS[i % CHART_COLORS.length] : undefined }} />{getDisplayName(u)} {isSelected ? <Eye size={12}/> : <EyeOff size={12}/>}</button>;
                         })}
                     </div>
                 </div>
