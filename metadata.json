@@ -1,0 +1,5 @@
+{
+  "name": "Tea&O Amazing Race",
+  "description": "A dark-themed stepathon tracker visualization mapping 20 users across a 4,195-mile route from Seattle to NYC using Leaflet.js.",
+  "requestFramePermissions": []
+}
