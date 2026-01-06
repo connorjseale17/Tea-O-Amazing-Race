@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { Waypoint } from '../types';
 import { getPositionAtProgress } from '../utils/geo';
-import { ROUTE_WAYPOINTS } from '../constants';
+import { ROUTE_WAYPOINTS, TOTAL_GOAL_MILES } from '../constants';
 
 // Google-style marker
 const iconShoe = L.divIcon({
@@ -66,13 +66,24 @@ const RaceMap: React.FC<RaceMapProps> = ({ progressPercentage, viewMode }) => {
 
     // Update current position marker
     const [lat, lng] = getPositionAtProgress(ROUTE_WAYPOINTS, progressPercentage);
+    const milesCovered = (progressPercentage * TOTAL_GOAL_MILES).toFixed(1);
+    const percentDisplay = (progressPercentage * 100).toFixed(2);
     
+    // Custom Popup Content
+    const popupContent = `
+      <div class="text-center font-sans">
+        <div class="font-bold text-gray-800 text-sm">Current Location</div>
+        <div class="text-xs text-gray-500 mt-1">${percentDisplay}% Complete</div>
+        <div class="text-sm font-bold text-[#4285F4] mt-1 border-t pt-1 border-gray-100">${milesCovered} miles</div>
+      </div>
+    `;
+
     if (markerRef.current) {
       markerRef.current.setLatLng([lat, lng]);
-      markerRef.current.setPopupContent(`Current Location<br/>${(progressPercentage * 100).toFixed(2)}% Complete`);
+      markerRef.current.setPopupContent(popupContent);
     } else {
       markerRef.current = L.marker([lat, lng], { icon: iconShoe }).addTo(mapInstanceRef.current);
-      markerRef.current.bindPopup(`Current Location<br/>${(progressPercentage * 100).toFixed(2)}% Complete`);
+      markerRef.current.bindPopup(popupContent);
     }
 
     // Handle View Mode Switching

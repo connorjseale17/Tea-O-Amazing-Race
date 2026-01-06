@@ -1,38 +1,36 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Calendar, Zap, TrendingUp, Clock } from 'lucide-react';
+import { TOTAL_WEEKS } from '../constants';
+import { Zap, TrendingUp, Clock, Calendar } from 'lucide-react';
 
 interface TimeBasedLeaderboardProps {
   users: User[];
 }
 
-type TimeFrame = 'weekly' | 'monthly';
+// viewMode: 'overall' or string representing the week number '1', '2'...
+type ViewMode = 'overall' | string;
 
 const TimeBasedLeaderboard: React.FC<TimeBasedLeaderboardProps> = ({ users }) => {
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>('weekly');
+  const [viewMode, setViewMode] = useState<ViewMode>('overall');
+  const weeksArray = Array.from({ length: TOTAL_WEEKS }, (_, i) => (i + 1).toString());
 
-  const calculateScore = (user: User, days: number) => {
-    if (!user.stepHistory || user.stepHistory.length === 0) return 0;
-    
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
-
-    return user.stepHistory
-      .filter(entry => new Date(entry.date) >= cutoffDate)
-      .reduce((sum, entry) => sum + entry.amount, 0);
+  const calculateScore = (user: User) => {
+    if (viewMode === 'overall') {
+      return user.steps || 0;
+    }
+    // Access the specific week from the dictionary
+    return user.weeklySteps ? (user.weeklySteps[viewMode] || 0) : 0;
   };
 
   const getLeaderboardData = () => {
-    const days = timeFrame === 'weekly' ? 7 : 30;
-    
     return users
       .map(user => ({
         ...user,
-        periodScore: calculateScore(user, days)
+        currentScore: calculateScore(user)
       }))
-      .sort((a, b) => b.periodScore - a.periodScore)
+      .sort((a, b) => b.currentScore - a.currentScore)
       .slice(0, 5) // Top 5
-      .filter(u => u.periodScore > 0); // Only show if they have steps in this period
+      .filter(u => u.currentScore > 0); // Only show if they have steps
   };
 
   const leaders = getLeaderboardData();
@@ -45,37 +43,33 @@ const TimeBasedLeaderboard: React.FC<TimeBasedLeaderboardProps> = ({ users }) =>
 
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 relative z-10 gap-4">
         <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-full ${timeFrame === 'weekly' ? 'bg-indigo-100 text-indigo-600' : 'bg-purple-100 text-purple-600'} transition-colors duration-300`}>
-             {timeFrame === 'weekly' ? <Zap size={24} /> : <Calendar size={24} />}
+          <div className={`p-3 rounded-full ${viewMode === 'overall' ? 'bg-indigo-100 text-indigo-600' : 'bg-purple-100 text-purple-600'} transition-colors duration-300`}>
+             {viewMode === 'overall' ? <Zap size={24} /> : <Calendar size={24} />}
           </div>
           <div>
             <h2 className="text-2xl font-normal text-gray-800">Momentum Tracker</h2>
-            <p className="text-gray-500 text-sm">Who is moving the most right now?</p>
+            <p className="text-gray-500 text-sm">
+              {viewMode === 'overall' ? 'All-time race leaders' : `Top performers for Week ${viewMode}`}
+            </p>
           </div>
         </div>
 
-        {/* Toggle Switch */}
-        <div className="bg-gray-100 p-1.5 rounded-xl flex items-center">
-          <button
-            onClick={() => setTimeFrame('weekly')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-              timeFrame === 'weekly' 
-                ? 'bg-white text-indigo-600 shadow-sm' 
-                : 'text-gray-400 hover:text-gray-600'
-            }`}
+        {/* Week Selector Dropdown */}
+        <div className="bg-gray-100 p-1.5 rounded-xl flex items-center relative">
+          <select 
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value)}
+            className="appearance-none bg-white text-gray-800 font-bold py-2 pl-4 pr-10 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm border-0"
           >
-            Last 7 Days
-          </button>
-          <button
-            onClick={() => setTimeFrame('monthly')}
-            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-              timeFrame === 'monthly' 
-                ? 'bg-white text-purple-600 shadow-sm' 
-                : 'text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            Last 30 Days
-          </button>
+            <option value="overall">🏆 Overall Leaders</option>
+            {weeksArray.map(week => (
+              <option key={week} value={week}>📅 Week {week}</option>
+            ))}
+          </select>
+          {/* Custom Arrow */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-600">
+            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+          </div>
         </div>
       </div>
 
@@ -83,8 +77,7 @@ const TimeBasedLeaderboard: React.FC<TimeBasedLeaderboardProps> = ({ users }) =>
         {leaders.length === 0 ? (
            <div className="col-span-full py-12 text-center text-gray-400 flex flex-col items-center">
               <Clock size={48} className="mb-4 opacity-20" />
-              <p>No activity recorded in this time period yet.</p>
-              <p className="text-xs mt-1">Start logging steps to see momentum stats!</p>
+              <p>No activity recorded for this period.</p>
            </div>
         ) : (
           leaders.map((user, index) => (
@@ -97,11 +90,11 @@ const TimeBasedLeaderboard: React.FC<TimeBasedLeaderboardProps> = ({ users }) =>
             >
                {index === 0 && (
                  <div className="mb-2 bg-yellow-100 text-[#f59e0b] px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                   <TrendingUp size={12} /> ON FIRE
+                   <TrendingUp size={12} /> LEADER
                  </div>
                )}
                <div className="mb-2">
-                 {/* Re-using logic to grab icon color based on ID from parent would be ideal, but simple fallback circle is fine for this view */}
+                 {/* Rank Badge */}
                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold
                     ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 
                       index === 1 ? 'bg-gray-200 text-gray-700' :
@@ -111,8 +104,8 @@ const TimeBasedLeaderboard: React.FC<TimeBasedLeaderboardProps> = ({ users }) =>
                  </div>
                </div>
                <h3 className="font-bold text-gray-800 text-center leading-tight mb-1 truncate w-full">{getDisplayName(user)}</h3>
-               <p className={`text-xl font-roboto font-bold ${timeFrame === 'weekly' ? 'text-indigo-600' : 'text-purple-600'}`}>
-                 {user.periodScore.toLocaleString()}
+               <p className={`text-xl font-roboto font-bold ${viewMode === 'overall' ? 'text-indigo-600' : 'text-purple-600'}`}>
+                 {user.currentScore.toLocaleString()}
                </p>
                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-medium">Steps</p>
             </div>

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { MAX_USERS } from '../constants';
+import { MAX_USERS, TOTAL_WEEKS } from '../constants';
 import { 
   Plus, Check, UserPlus, X, Trash2,
   Zap, Star, Heart, Trophy, Crown, Smile, 
   Ghost, Cat, Dog, Fish, Bird, Bug, 
-  Flower, TreePine, Sun, Moon, Cloud, Flame, Droplets, Rocket
+  Flower, TreePine, Sun, Moon, Cloud, Flame, Droplets, Rocket, Calendar,
+  History
 } from 'lucide-react';
 
 // --- ICON LIBRARY CONFIGURATION ---
@@ -34,18 +35,20 @@ const ICON_LIBRARY = [
 
 interface AddStepsFormProps {
   users: User[];
-  onAddSteps: (userId: string, steps: number) => void;
+  onAddSteps: (userId: string, steps: number, week: number) => void;
   onAddUser: (name: string, teamName: string, iconId: string) => void;
   onRemoveUser: (userId: string) => void;
+  onDeleteStep: (userId: string, entryIndex: number) => void;
 }
 
-const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUser, onRemoveUser }) => {
+const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUser, onRemoveUser, onDeleteStep }) => {
   // Modes: 'view', 'add-steps', 'create-user'
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   
   // Form States
   const [stepInput, setStepInput] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [newUserName, setNewUserName] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [selectedIconId, setSelectedIconId] = useState('smile');
@@ -54,13 +57,13 @@ const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUse
   const emptySlotsCount = Math.max(0, MAX_USERS - users.length);
   const emptySlots = Array.from({ length: emptySlotsCount }, (_, i) => i);
   const selectedUser = users.find(u => u.id === selectedUserId);
+  const weeksArray = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
 
   const handleStepSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedUserId && stepInput) {
-      onAddSteps(selectedUserId, parseInt(stepInput));
+      onAddSteps(selectedUserId, parseInt(stepInput), selectedWeek);
       setStepInput('');
-      setSelectedUserId(null); 
     }
   };
 
@@ -75,10 +78,11 @@ const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUse
     }
   };
 
-  const handleRemoveClick = () => {
+  const handleRemoveClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (selectedUserId) {
         onRemoveUser(selectedUserId);
-        setSelectedUserId(null);
     }
   }
 
@@ -99,7 +103,7 @@ const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUse
         <div>
           <h3 className="text-2xl font-normal text-gray-800">Team Roster</h3>
           <p className="text-gray-500 mt-1">
-             Select a racer to log activity or fill an empty slot to join the race.
+             Select a racer to log <span className="font-bold text-gray-700">Weekly Steps</span> or join the race.
              <span className="ml-2 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-xs font-bold">
                {users.length}/{MAX_USERS} Spots Filled
              </span>
@@ -123,8 +127,8 @@ const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUse
       {selectedUser && (
         <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-6 mb-8 animate-fade-in relative">
            
-           <div className="flex flex-col md:flex-row items-center gap-6">
-             <div className="flex items-center gap-4">
+           <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8">
+             <div className="flex items-center gap-4 min-w-[200px]">
                 <div className="transform scale-125">
                   {getIconComponent(selectedUser.iconId)}
                 </div>
@@ -132,16 +136,33 @@ const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUse
                    <h4 className="text-xl font-bold text-gray-800">{getDisplayName(selectedUser)}</h4>
                    <p className="text-sm text-gray-500">
                       {getSubtext(selectedUser) ? `${getSubtext(selectedUser)} • ` : ''} 
-                      {selectedUser.steps.toLocaleString()} steps
+                      {(selectedUser.steps || 0).toLocaleString()} total
                    </p>
                 </div>
              </div>
-             <form onSubmit={handleStepSubmit} className="flex-1 w-full flex gap-3">
+             
+             <form onSubmit={handleStepSubmit} className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+                {/* Week Selector */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Calendar size={18} className="text-gray-400" />
+                  </div>
+                  <select
+                    value={selectedWeek}
+                    onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
+                    className="h-full bg-white border border-gray-200 text-gray-700 text-lg rounded-xl pl-10 pr-8 py-4 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm appearance-none cursor-pointer"
+                  >
+                    {weeksArray.map(week => (
+                      <option key={week} value={week}>Week {week}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <input 
                   type="number" 
                   value={stepInput}
                   onChange={(e) => setStepInput(e.target.value)}
-                  placeholder="Enter daily steps..."
+                  placeholder="Steps for this week..."
                   autoFocus
                   className="flex-1 bg-white border border-gray-200 text-lg rounded-xl p-4 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
                   required
@@ -149,21 +170,76 @@ const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUse
                 />
                 <button 
                   type="submit"
-                  className="bg-[#4285F4] hover:bg-blue-600 text-white px-8 rounded-xl font-medium transition-colors shadow-md flex items-center gap-2"
+                  className="bg-[#4285F4] hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-medium transition-colors shadow-md flex items-center justify-center gap-2"
                 >
-                  <Check size={24} /> Log Steps
+                  <Check size={24} /> Log
                 </button>
              </form>
            </div>
            
+           {/* --- HISTORY LOG & EDIT SECTION --- */}
+           <div className="bg-white rounded-xl border border-blue-100 overflow-hidden mb-6">
+              <div className="px-4 py-3 bg-blue-100/30 flex items-center gap-2 border-b border-blue-100">
+                <History size={16} className="text-blue-600" />
+                <h5 className="text-xs font-bold text-blue-800 uppercase tracking-wide">Recent Entries</h5>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                 {(!selectedUser.stepHistory || selectedUser.stepHistory.length === 0) && (
+                    <div className="p-6 text-center text-gray-400 italic text-sm">No history logged yet.</div>
+                 )}
+                 {selectedUser.stepHistory && selectedUser.stepHistory.length > 0 && (
+                   <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-gray-400 bg-gray-50 border-b border-gray-100">
+                        <tr>
+                          <th className="px-4 py-2 font-medium">Date</th>
+                          <th className="px-4 py-2 font-medium">Week</th>
+                          <th className="px-4 py-2 font-medium">Amount</th>
+                          <th className="px-4 py-2 font-medium text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {/* We map in reverse to show newest first */}
+                        {[...selectedUser.stepHistory].reverse().map((entry, reverseIndex) => {
+                          const realIndex = selectedUser.stepHistory!.length - 1 - reverseIndex;
+                          return (
+                            <tr key={realIndex} className="hover:bg-blue-50/30 transition-colors">
+                               <td className="px-4 py-3 text-gray-500">
+                                 {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
+                               </td>
+                               <td className="px-4 py-3 text-gray-600 font-medium">Week {entry.week || '?'}</td>
+                               <td className="px-4 py-3 font-bold text-gray-800">+{(entry?.amount || 0).toLocaleString()}</td>
+                               <td className="px-4 py-3 text-right">
+                                  <button 
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      onDeleteStep(selectedUser.id, realIndex);
+                                    }}
+                                    className="text-red-300 hover:text-red-500 p-1 hover:bg-red-50 rounded-md transition-all cursor-pointer z-10 relative"
+                                    title="Delete this entry (fix mistypes)"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                               </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                   </table>
+                 )}
+              </div>
+           </div>
+
            {/* Remove User Action */}
-           <div className="mt-6 pt-4 border-t border-blue-200/50 flex justify-end">
+           <div className="pt-4 border-t border-blue-200/50 flex justify-end">
               <button 
+                type="button"
                 onClick={handleRemoveClick}
-                className="flex items-center gap-2 text-red-400 hover:text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                className="flex items-center gap-2 bg-white border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 px-4 py-2 rounded-lg transition-all text-sm font-bold shadow-sm cursor-pointer"
                 title="Remove this racer from the competition"
               >
-                  <Trash2 size={16} /> Remove Racer
+                  <Trash2 size={16} /> Delete Racer Profile
               </button>
            </div>
         </div>
@@ -265,7 +341,7 @@ const AddStepsForm: React.FC<AddStepsFormProps> = ({ users, onAddSteps, onAddUse
                   {subText && (
                     <p className="text-xs text-gray-500 font-medium mt-0.5 truncate w-full px-1">{subText}</p>
                   )}
-                  <p className="text-xs text-blue-500 font-bold mt-1 bg-blue-50 inline-block px-2 py-0.5 rounded-full">{u.steps.toLocaleString()} steps</p>
+                  <p className="text-xs text-blue-500 font-bold mt-1 bg-blue-50 inline-block px-2 py-0.5 rounded-full">{(u.steps || 0).toLocaleString()} steps</p>
                 </div>
               </button>
             );

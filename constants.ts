@@ -5,6 +5,7 @@ export const STEPS_PER_MILE = 2000;
 export const TOTAL_GOAL_MILES = 4195;
 export const TOTAL_GOAL_STEPS = TOTAL_GOAL_MILES * STEPS_PER_MILE;
 export const MAX_USERS = 20;
+export const TOTAL_WEEKS = 12; // 3 Month Challenge
 
 // Route: Seattle -> SF -> LA -> Vegas -> Moab -> Denver -> Chicago -> Philly -> NYC
 export const ROUTE_WAYPOINTS: Waypoint[] = [

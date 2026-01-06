@@ -5,9 +5,10 @@ import RaceMap from './components/RaceMap';
 import DashboardStats from './components/DashboardStats';
 import Leaderboard from './components/Leaderboard';
 import TimeBasedLeaderboard from './components/TimeBasedLeaderboard';
+import WeeklyAnalytics from './components/WeeklyAnalytics';
 import AddStepsForm from './components/AddStepsForm';
 import ReportGenerator from './components/ReportGenerator';
-import { MapPin, Globe, Navigation, CloudOff, CloudLightning, RefreshCw } from 'lucide-react';
+import { MapPin, Globe, Navigation, CloudOff, CloudLightning, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
 import { api } from './api';
 
 const App: React.FC = () => {
@@ -19,9 +20,11 @@ const App: React.FC = () => {
   // Status State
   const [isOffline, setIsOffline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'live' | 'local'>('connecting');
+  const [isResetting, setIsResetting] = useState(false);
 
-  // Derived State
-  const totalSteps = users.reduce((acc, user) => acc + user.steps, 0);
+  // Derived State - Robust Calculation
+  // We explicitly cast to Number to ensure safety against malformed data
+  const totalSteps = users.reduce((acc, user) => acc + (Number(user.steps) || 0), 0);
   const progressPercentage = Math.min(totalSteps / TOTAL_GOAL_STEPS, 1);
 
   // --- API INTEGRATION ---
@@ -65,12 +68,54 @@ const App: React.FC = () => {
     api.retryConnection();
   };
 
-  const handleAddSteps = async (userId: string, steps: number) => {
+  const handleAddSteps = async (userId: string, steps: number, week: number) => {
     // Optimistic Update
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, steps: u.steps + steps } : u));
+    setUsers(prev => prev.map(u => {
+      if (u.id === userId) {
+        // Update total
+        const newTotal = u.steps + steps;
+        // Update week entry safely
+        const updatedWeekly = { ...u.weeklySteps };
+        updatedWeekly[week] = (updatedWeekly[week] || 0) + steps;
+        
+        // Optimistic history add (temporary)
+        const newHistory = [...(u.stepHistory || []), { amount: steps, date: new Date().toISOString(), week }];
+
+        return { ...u, steps: newTotal, weeklySteps: updatedWeekly, stepHistory: newHistory };
+      }
+      return u;
+    }));
 
     // API Call
-    await api.addSteps(userId, steps);
+    await api.addSteps(userId, steps, week);
+  };
+
+  const handleDeleteStep = async (userId: string, entryIndex: number) => {
+     if (!window.confirm("Are you sure you want to delete this entry?")) return;
+
+     // Optimistic Update
+     setUsers(prev => prev.map(u => {
+       if (u.id === userId) {
+         const history = u.stepHistory || [];
+         const entry = history[entryIndex];
+         
+         if (!entry) return u; // Safeguard
+
+         const newTotal = Math.max(0, u.steps - entry.amount);
+         const updatedWeekly = { ...u.weeklySteps };
+         if (entry.week) {
+           updatedWeekly[entry.week] = Math.max(0, (updatedWeekly[entry.week] || 0) - entry.amount);
+         }
+         
+         const newHistory = [...history];
+         newHistory.splice(entryIndex, 1);
+         
+         return { ...u, steps: newTotal, weeklySteps: updatedWeekly, stepHistory: newHistory };
+       }
+       return u;
+     }));
+
+     await api.removeStepEntry(userId, entryIndex);
   };
 
   const handleAddUser = async (name: string, teamName: string, iconId: string) => {
@@ -79,9 +124,32 @@ const App: React.FC = () => {
   };
 
   const handleRemoveUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to remove this racer? This cannot be undone.")) return;
-    setUsers(users.filter(u => u.id !== userId));
+    if (!window.confirm("WARNING: This will permanently delete this racer and ALL their data. The total team distance will decrease. Are you sure?")) return;
+    
+    // Optimistic Update - Immediately remove from UI
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    
+    // API Call
     await api.deleteUser(userId);
+  };
+
+  const handleResetRace = async () => {
+    const confirmation = window.prompt("DANGER: This will delete ALL racers and ALL step data permanently.\n\nType 'DELETE ALL' to confirm:");
+    
+    if (confirmation && confirmation.toUpperCase() === 'DELETE ALL') {
+        setIsResetting(true);
+        try {
+            await api.resetRace();
+            setUsers([]); // Clear state immediately
+            // Small delay to let the UI update show clean slate before reload
+            setTimeout(() => {
+                window.location.reload(); 
+            }, 500);
+        } catch(e) {
+            alert("Reset failed. Check console.");
+            setIsResetting(false);
+        }
+    }
   };
 
   const closeNotification = () => setActiveNotification(null);
@@ -163,7 +231,7 @@ const App: React.FC = () => {
         )}
 
         {/* Stats Dashboard */}
-        <DashboardStats totalSteps={totalSteps} />
+        <DashboardStats totalSteps={totalSteps} activeUserCount={users.length} />
 
         {/* Map */}
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
@@ -203,15 +271,36 @@ const App: React.FC = () => {
         <div>
           <TimeBasedLeaderboard users={users} />
         </div>
+        
+        {/* Weekly Analytics Chart */}
+        <div>
+          <WeeklyAnalytics users={users} />
+        </div>
           
         {/* Roster / Add User Form */}
-        <AddStepsForm users={users} onAddSteps={handleAddSteps} onAddUser={handleAddUser} onRemoveUser={handleRemoveUser} />
+        <AddStepsForm 
+          users={users} 
+          onAddSteps={handleAddSteps} 
+          onAddUser={handleAddUser} 
+          onRemoveUser={handleRemoveUser} 
+          onDeleteStep={handleDeleteStep}
+        />
 
         {/* Footer Actions */}
         <ReportGenerator users={users} totalSteps={totalSteps} />
 
-        <footer className="text-center text-gray-400 text-sm pt-12">
-           <p>© 2024 Tea&O • Internal Step Challenge</p>
+        <footer className="text-center text-gray-400 text-sm pt-12 pb-8">
+           <p className="mb-4">© 2024 Tea&O • Internal Step Challenge</p>
+           
+           {/* Danger Zone */}
+           <button 
+             onClick={handleResetRace}
+             disabled={isResetting}
+             className="text-red-200 hover:text-red-500 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 mx-auto transition-colors disabled:opacity-50 disabled:cursor-wait"
+           >
+             {isResetting ? <Loader2 size={12} className="animate-spin" /> : <AlertTriangle size={12} />}
+             {isResetting ? 'Wiping Data...' : 'Admin Reset'}
+           </button>
         </footer>
       </div>
     </div>

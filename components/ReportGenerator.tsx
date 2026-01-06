@@ -14,7 +14,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ users, totalSteps }) 
   const getDisplayName = (u: User) => u.teamName ? `${u.teamName} (${u.name})` : u.name;
 
   const generateReport = () => {
-    const sorted = [...users].sort((a, b) => b.steps - a.steps);
+    const sorted = [...users].sort((a, b) => (b.steps || 0) - (a.steps || 0));
     const top = sorted[0];
     const bottom = sorted[sorted.length - 1];
     const percent = ((totalSteps / TOTAL_GOAL_STEPS) * 100).toFixed(2);
@@ -27,10 +27,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ users, totalSteps }) 
 📊 Race Progress: ${percent}%
 
 🏆 WALKER SPOTLIGHT:
-${top ? `${getDisplayName(top)} is leading the pack with ${top.steps.toLocaleString()} steps!` : 'No data yet.'}
+${top ? `${getDisplayName(top)} is leading the pack with ${(top.steps || 0).toLocaleString()} steps!` : 'No data yet.'}
 
 🐢 SLACKER ALERT:
-${bottom ? `Come on ${getDisplayName(bottom)}, pick up the pace! (${bottom.steps.toLocaleString()} steps)` : 'No data yet.'}
+${bottom ? `Come on ${getDisplayName(bottom)}, pick up the pace! (${(bottom.steps || 0).toLocaleString()} steps)` : 'No data yet.'}
 
 #TeaAndOAmazingRace #StepChallenge
     `.trim();

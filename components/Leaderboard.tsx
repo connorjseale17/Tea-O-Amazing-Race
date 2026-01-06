@@ -7,7 +7,7 @@ interface LeaderboardProps {
 }
 
 const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
-  const sortedUsers = [...users].sort((a, b) => b.steps - a.steps);
+  const sortedUsers = [...users].sort((a, b) => (b.steps || 0) - (a.steps || 0));
   const podium = sortedUsers.slice(0, 5); // Top 5
   // For pit crew, we want the bottom 5, but sorted descending (worst is last) or ascending?
   // Usually "Needs Motivation" implies showing the ones with lowest steps.
@@ -58,7 +58,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                      {getSubtext(user) && <span className="text-xs text-gray-400">{getSubtext(user)}</span>}
                   </div>
                 </div>
-                <span className="font-roboto text-gray-900 font-bold">{user.steps.toLocaleString()}</span>
+                <span className="font-roboto text-gray-900 font-bold">{(user.steps || 0).toLocaleString()}</span>
               </li>
             ))}
           </ul>
@@ -88,7 +88,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users }) => {
                      {getSubtext(user) && <span className="text-xs text-gray-400">{getSubtext(user)}</span>}
                   </div>
                 </div>
-                <span className="font-roboto text-[#EA4335] font-medium">{user.steps.toLocaleString()}</span>
+                <span className="font-roboto text-[#EA4335] font-medium">{(user.steps || 0).toLocaleString()}</span>
               </li>
             ))}
           </ul>
