@@ -398,8 +398,9 @@
 
         const Leaderboard = ({ users }) => {
           const sortedUsers = [...users].sort((a, b) => (b.steps || 0) - (a.steps || 0));
-          const podium = sortedUsers.slice(0, 5);
-          const pitCrew = sortedUsers.slice(-5).reverse();
+          const topLeaders = sortedUsers.slice(0, 5);
+          const chasers = sortedUsers.slice(5, 10);
+          
           const getRankColor = (index) => {
             switch (index) {
               case 0: return 'bg-[#FBBC05] text-white';
@@ -413,14 +414,15 @@
 
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Top 5 */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                 <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
                     <div className="bg-yellow-100 p-2 rounded-full"><Award className="text-[#FBBC05]" size={20} /></div>
-                    <h2 className="text-lg font-normal text-gray-800">Top 5 Walkers</h2>
+                    <h2 className="text-lg font-normal text-gray-800">Leaderboard (Top 5)</h2>
                 </div>
                 {users.length === 0 ? <p className="text-gray-400 text-center italic py-4">Waiting for racers...</p> : (
                   <ul className="space-y-4">
-                    {podium.map((user, index) => (
+                    {topLeaders.map((user, index) => (
                       <li key={user.id} className="flex items-center justify-between group">
                         <div className="flex items-center gap-4">
                           <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${getRankColor(index)}`}>{index + 1}</span>
@@ -432,20 +434,22 @@
                   </ul>
                 )}
               </div>
+              
+              {/* Next 5 (The Chase) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                 <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
-                    <div className="bg-red-50 p-2 rounded-full"><ArrowDown className="text-[#EA4335]" size={20} /></div>
-                    <h2 className="text-lg font-normal text-gray-800">Needs Motivation (Bottom 5)</h2>
+                    <div className="bg-blue-50 p-2 rounded-full"><TrendingUp className="text-[#4285F4]" size={20} /></div>
+                    <h2 className="text-lg font-normal text-gray-800">In The Hunt (6-10)</h2>
                 </div>
-                 {users.length === 0 ? <p className="text-gray-400 text-center italic py-4">No data yet.</p> : (
+                 {chasers.length === 0 ? <p className="text-gray-400 text-center italic py-4 text-sm">More racers needed to fill the ranks!</p> : (
                   <ul className="space-y-4">
-                    {pitCrew.map((user, index) => (
-                      <li key={user.id} className="flex items-center justify-between opacity-80">
+                    {chasers.map((user, index) => (
+                      <li key={user.id} className="flex items-center justify-between opacity-90 hover:opacity-100 transition-opacity">
                         <div className="flex items-center gap-4">
-                          <span className="w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold bg-gray-100 text-gray-500">{users.length - index}</span>
+                          <span className="w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold bg-gray-100 text-gray-500">{index + 6}</span>
                           <div><span className="text-gray-600 font-medium text-lg block leading-tight">{getDisplayName(user)}</span>{getSubtext(user) && <span className="text-xs text-gray-400">{getSubtext(user)}</span>}</div>
                         </div>
-                        <span className="font-roboto text-[#EA4335] font-medium">{(user.steps || 0).toLocaleString()}</span>
+                        <span className="font-roboto text-gray-600 font-medium">{(user.steps || 0).toLocaleString()}</span>
                       </li>
                     ))}
                   </ul>
