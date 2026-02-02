@@ -1,91 +1,138 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Tea&O Amazing Race - Firebase Edition</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tea&O Amazing Race</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Outfit is the closest free Google Font to 'Google Sans' -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Leaflet JS (Global) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Import Map for Modules -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1",
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+      }
+    }
+    </script>
+
     <style>
-        #map { height: 500px; width: 100%; border-radius: 15px; }
-        .neon-border { border: 2px solid #00f2ff; box-shadow: 0 0 10px #00f2ff; }
-        /* Custom scrollbar for leaderboard */
-        #leaderboard::-webkit-scrollbar { width: 6px; }
-        #leaderboard::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        .custom-div-icon div {
-            animation: pulse 2s infinite;
+        /* Force Outfit as the primary font to mimic Google Sans */
+        body { font-family: 'Outfit', sans-serif; }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 242, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        
+        @keyframes bounceIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            70% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); }
         }
+        .animate-bounce-in { animation: bounceIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
     </style>
 </head>
-<body class="bg-slate-900 text-white p-4 font-sans">
+<body class="bg-[#f8f9fa] text-gray-800 antialiased selection:bg-blue-100 selection:text-blue-700">
+    <div id="root"></div>
 
-    <header class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-cyan-400 uppercase tracking-widest drop-shadow-lg">Tea&O Amazing Race</h1>
-        <p class="text-slate-400 mt-2">Seattle → NYC | Goal: 8,390,000 Steps</p>
-    </header>
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+            MapPin, Globe, Navigation, CloudOff, CloudLightning, RefreshCw, AlertTriangle, Loader2,
+            Plus, Check, UserPlus, X, Trash2, Zap, Star, Heart, Trophy, Crown, Smile, 
+            Ghost, Cat, Dog, Fish, Bird, Bug, Flower, TreePine, Sun, Moon, Cloud, Flame, 
+            Droplets, Rocket, Calendar, History, Award, ArrowDown, Users, BarChart2, Eye, EyeOff,
+            ClipboardCopy, Download, TrendingUp, Clock
+        } from 'lucide-react';
+        import { initializeApp } from 'firebase/app';
+        import { 
+            getFirestore, collection, addDoc, updateDoc, deleteDoc, increment, 
+            arrayUnion, onSnapshot, serverTimestamp, getDocs, doc, getDoc, setDoc 
+        } from 'firebase/firestore';
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-        <div class="space-y-6">
-            <!-- Input Form -->
-            <div class="bg-slate-800 p-6 rounded-xl neon-border">
-                <h2 class="text-xl font-bold mb-4 text-cyan-300">Log Your Steps</h2>
-                <input type="text" id="userName" placeholder="Your Name" class="w-full mb-3 p-3 rounded bg-slate-700 border border-slate-600 text-white focus:outline-none focus:border-cyan-400 transition">
-                <input type="number" id="stepCount" placeholder="Steps to Add" class="w-full mb-4 p-3 rounded bg-slate-700 border border-slate-600 text-white focus:outline-none focus:border-cyan-400 transition">
-                <button id="submitSteps" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded transition duration-200 uppercase tracking-wide">
-                    Update Race
-                </button>
-                <p id="statusMsg" class="text-center text-xs mt-2 h-4 text-green-400"></p>
-            </div>
+        // --- CONSTANTS ---
+        const STEPS_PER_MILE = 2000;
+        const TOTAL_GOAL_MILES = 4195;
+        const TOTAL_GOAL_STEPS = TOTAL_GOAL_MILES * STEPS_PER_MILE;
+        const MAX_USERS = 20;
+        const TOTAL_WEEKS = 12;
 
-            <!-- Leaderboard -->
-            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 h-96 flex flex-col">
-                <h2 class="text-xl font-bold mb-4 flex justify-between">
-                    <span>Leaderboard</span>
-                    <span class="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">Live</span>
-                </h2>
-                <div id="leaderboard" class="space-y-2 text-sm overflow-y-auto flex-1 pr-2">
-                    <p class="text-slate-500 text-center italic">Connecting to satellite...</p>
-                </div>
-            </div>
-        </div>
+        const ROUTE_WAYPOINTS = [
+            { name: "Seattle, WA", lat: 47.6062, lng: -122.3321, fact: "Start Line! Did you know Seattle has a troll living under the Aurora Bridge?" },
+            { name: "San Francisco, CA", lat: 37.7749, lng: -122.4194, fact: "The Golden Gate Bridge's color is officially called 'International Orange'." },
+            { name: "Los Angeles, CA", lat: 34.0522, lng: -118.2437, fact: "LA's full name is 'El Pueblo de Nuestra Señora la Reina de los Ángeles del Río Porciúncula'." },
+            { name: "Las Vegas, NV", lat: 36.1699, lng: -115.1398, fact: "The Luxor Las Vegas Sky Beam is the brightest light beam in the world." },
+            { name: "Moab, UT", lat: 38.5733, lng: -109.5498, fact: "Moab is home to the stunning arches of Arches National Park." },
+            { name: "Denver, CO", lat: 39.7392, lng: -104.9903, fact: "The 13th step of the State Capitol building is exactly one mile above sea level." },
+            { name: "Chicago, IL", lat: 41.8781, lng: -87.6298, fact: "The Chicago River is the only river in the world that flows backwards." },
+            { name: "Philadelphia, PA", lat: 39.9526, lng: -75.1652, fact: "Philadelphia is home to America's first zoo and first hospital." },
+            { name: "New York City, NY", lat: 40.7128, lng: -74.0060, fact: "Finish Line! NYC has more than 800 languages spoken, making it the most linguistically diverse city." }
+        ];
 
-        <!-- Map Section -->
-        <div class="lg:col-span-2 space-y-4">
-            <div id="map" class="z-0"></div>
-            
-            <div class="bg-slate-800 p-6 rounded-xl flex flex-col md:flex-row justify-between items-center border border-slate-700 shadow-lg">
-                <div class="mb-4 md:mb-0">
-                    <span class="text-slate-400 block text-xs uppercase tracking-wider">Group Progress</span>
-                    <span id="totalMiles" class="text-3xl font-mono text-cyan-300 font-bold">0</span>
-                    <span class="text-slate-500 text-sm"> / 4,195 Miles</span>
-                </div>
-                
-                <!-- Progress Bar -->
-                <div class="flex-1 mx-6 w-full md:w-auto">
-                    <div class="w-full bg-slate-700 rounded-full h-2.5">
-                        <div id="progressBar" class="bg-cyan-500 h-2.5 rounded-full" style="width: 0%"></div>
-                    </div>
-                </div>
+        // --- UTILS ---
+        function toRad(value) { return (value * Math.PI) / 180; }
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(toRad(lat1)) * Math.cos(toRad(lat2));
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+        function calculateRouteTotalDistance(waypoints) {
+            let total = 0;
+            for (let i = 0; i < waypoints.length - 1; i++) {
+                total += haversineDistance(waypoints[i].lat, waypoints[i].lng, waypoints[i + 1].lat, waypoints[i + 1].lng);
+            }
+            return total;
+        }
+        function getPositionAtProgress(waypoints, percentage) {
+            if (percentage <= 0) return [waypoints[0].lat, waypoints[0].lng];
+            if (percentage >= 1) return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lng];
+            const totalDist = calculateRouteTotalDistance(waypoints);
+            const targetDist = totalDist * percentage;
+            let currentDist = 0;
+            for (let i = 0; i < waypoints.length - 1; i++) {
+                const segmentDist = haversineDistance(waypoints[i].lat, waypoints[i].lng, waypoints[i + 1].lat, waypoints[i + 1].lng);
+                if (currentDist + segmentDist >= targetDist) {
+                    const remaining = targetDist - currentDist;
+                    const ratio = remaining / segmentDist;
+                    const lat = waypoints[i].lat + (waypoints[i + 1].lat - waypoints[i].lat) * ratio;
+                    const lng = waypoints[i].lng + (waypoints[i + 1].lng - waypoints[i].lng) * ratio;
+                    return [lat, lng];
+                }
+                currentDist += segmentDist;
+            }
+            return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lng];
+        }
 
-                <div class="text-right">
-                    <span class="text-slate-400 block text-xs uppercase tracking-wider">Next Stop</span>
-                    <span id="nextStop" class="text-lg font-bold text-white">Seattle</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        // --- 1. FIREBASE CONFIGURATION ---
+        // --- API & FIREBASE ---
         const firebaseConfig = {
           apiKey: "AIzaSyBscaY5kkaXkea9ZFoMeqYNvmCnVEVeTfs",
           authDomain: "tea-and-o-amazing-race.firebaseapp.com",
@@ -98,218 +145,663 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const RACERS_COLLECTION = "racers";
+        const RACERS_COLLECTION = 'racers';
+        const LOCAL_STORAGE_KEY = 'tea_o_race_data';
+        const listeners = [];
+        let unsubscribeSnapshot = null;
+        let isOfflineMode = false;
 
-        // --- 2. CONSTANTS & ROUTE DATA ---
-        const STEPS_PER_MILE = 2000;
-        const TOTAL_GOAL_MILES = 4195;
-        
-        const waypoints = [
-            { name: "Seattle", coords: [47.6062, -122.3321] },
-            { name: "San Francisco", coords: [37.7749, -122.4194] },
-            { name: "Los Angeles", coords: [34.0522, -118.2437] },
-            { name: "Las Vegas", coords: [36.1699, -115.1398] },
-            { name: "Moab", coords: [38.5733, -109.5498] },
-            { name: "Denver", coords: [39.7392, -104.9903] },
-            { name: "Chicago", coords: [41.8781, -87.6298] },
-            { name: "Philadelphia", coords: [39.9526, -75.1652] },
-            { name: "New York City", coords: [40.7128, -74.0060] }
+        const getLocalUsers = () => {
+          try {
+            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+            const users = data ? JSON.parse(data) : [];
+            // Sanitize data (robustness against bad entries)
+            return users.map(u => ({
+              ...u,
+              steps: typeof u.steps === 'number' ? u.steps : 0,
+              stepHistory: Array.isArray(u.stepHistory) 
+                ? u.stepHistory.map(e => ({ ...e, amount: typeof e.amount === 'number' ? e.amount : 0 }))
+                : []
+            }));
+          } catch { return []; }
+        };
+
+        const saveLocalUsers = (users) => {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(users));
+          listeners.forEach(cb => cb(users, false));
+        };
+
+        const startSnapshotListener = () => {
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+          const q = collection(db, RACERS_COLLECTION);
+          unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+              isOfflineMode = false;
+              const users = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    steps: typeof data.steps === 'number' ? data.steps : 0,
+                    stepHistory: Array.isArray(data.stepHistory) 
+                      ? data.stepHistory.map(e => ({ ...e, amount: typeof e.amount === 'number' ? e.amount : 0 }))
+                      : []
+                };
+              });
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(users));
+              listeners.forEach(cb => cb(users, true));
+            }, 
+            (error) => {
+              console.warn("Firebase Error:", error.message);
+              isOfflineMode = true;
+              listeners.forEach(cb => cb(getLocalUsers(), false));
+            }
+          );
+        };
+
+        const api = {
+          subscribeToUsers(callback) {
+            listeners.push(callback);
+            if (listeners.length === 1) startSnapshotListener();
+            else if (isOfflineMode) callback(getLocalUsers(), false);
+            return () => { const idx = listeners.indexOf(callback); if (idx !== -1) listeners.splice(idx, 1); };
+          },
+          retryConnection() { isOfflineMode = false; startSnapshotListener(); },
+          async addUser(name, teamName, iconId) {
+            const newUserBase = { name, teamName: teamName || "", iconId, steps: 0, weeklySteps: {}, stepHistory: [] };
+            try {
+              const docRef = await addDoc(collection(db, RACERS_COLLECTION), { ...newUserBase, createdAt: serverTimestamp() });
+              if (isOfflineMode) { isOfflineMode = false; startSnapshotListener(); }
+              return { id: docRef.id, ...newUserBase };
+            } catch (e) {
+              isOfflineMode = true;
+              const localUsers = getLocalUsers();
+              const newUser = { ...newUserBase, id: `local-${Date.now()}`, createdAt: new Date().toISOString() };
+              localUsers.push(newUser);
+              saveLocalUsers(localUsers);
+              return newUser;
+            }
+          },
+          async addSteps(userId, steps, week) {
+            try {
+              const userRef = doc(db, RACERS_COLLECTION, userId);
+              await updateDoc(userRef, {
+                steps: increment(steps),
+                [`weeklySteps.${week}`]: increment(steps),
+                stepHistory: arrayUnion({ amount: steps, date: new Date().toISOString(), week: week }),
+                lastUpdated: serverTimestamp()
+              });
+              if (isOfflineMode) { isOfflineMode = false; startSnapshotListener(); }
+              return { id: userId }; 
+            } catch (e) {
+              isOfflineMode = true;
+              const localUsers = getLocalUsers();
+              const user = localUsers.find(u => u.id === userId);
+              if (user) {
+                user.steps += steps;
+                if (!user.weeklySteps) user.weeklySteps = {};
+                user.weeklySteps[week] = (user.weeklySteps[week] || 0) + steps;
+                if (!user.stepHistory) user.stepHistory = [];
+                user.stepHistory.push({ amount: steps, date: new Date().toISOString(), week: week });
+                saveLocalUsers(localUsers);
+                return user;
+              }
+              return null;
+            }
+          },
+          async removeStepEntry(userId, entryIndex) {
+            try {
+              const userRef = doc(db, RACERS_COLLECTION, userId);
+              const snap = await getDoc(userRef);
+              if (!snap.exists()) throw new Error("User not found");
+              const userData = snap.data();
+              const history = userData.stepHistory || [];
+              if (entryIndex < 0 || entryIndex >= history.length) return false;
+              const entryToRemove = history[entryIndex];
+              const newHistory = [...history];
+              newHistory.splice(entryIndex, 1);
+              const currentTotal = userData.steps || 0;
+              const newTotal = Math.max(0, currentTotal - entryToRemove.amount);
+              const currentWeekly = userData.weeklySteps || {};
+              const weekKey = entryToRemove.week || 1;
+              const newWeekVal = Math.max(0, (currentWeekly[weekKey] || 0) - entryToRemove.amount);
+              await updateDoc(userRef, { steps: newTotal, weeklySteps: { ...currentWeekly, [weekKey]: newWeekVal }, stepHistory: newHistory, lastUpdated: serverTimestamp() });
+              return true;
+            } catch (e) {
+              isOfflineMode = true;
+              const localUsers = getLocalUsers();
+              const user = localUsers.find(u => u.id === userId);
+              if (user && user.stepHistory && user.stepHistory[entryIndex]) {
+                  const entry = user.stepHistory[entryIndex];
+                  user.steps = Math.max(0, user.steps - entry.amount);
+                  if (user.weeklySteps && entry.week) user.weeklySteps[entry.week] = Math.max(0, (user.weeklySteps[entry.week] || 0) - entry.amount);
+                  user.stepHistory.splice(entryIndex, 1);
+                  saveLocalUsers(localUsers);
+                  return true;
+              }
+              return false;
+            }
+          },
+          async deleteUser(userId) {
+            try {
+              await deleteDoc(doc(db, RACERS_COLLECTION, userId));
+              return true;
+            } catch (e) {
+              isOfflineMode = true;
+              const localUsers = getLocalUsers();
+              saveLocalUsers(localUsers.filter(u => u.id !== userId));
+              return true;
+            }
+          },
+          async resetRace() {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            listeners.forEach(cb => cb([], isOfflineMode));
+            try {
+              const querySnapshot = await getDocs(collection(db, RACERS_COLLECTION));
+              await Promise.all(querySnapshot.docs.map(d => deleteDoc(doc(db, RACERS_COLLECTION, d.id))));
+            } catch (e) { console.error("Firebase Reset failed", e); }
+          }
+        };
+
+        // --- COMPONENTS ---
+
+        const DashboardStats = ({ totalSteps, activeUserCount }) => {
+          const totalMiles = totalSteps / STEPS_PER_MILE;
+          const progressPercent = Math.min((totalSteps / TOTAL_GOAL_STEPS) * 100, 100);
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                <div className="relative z-10">
+                  <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Total Team Steps</h3>
+                  <p className="text-4xl font-normal text-gray-800 mt-2">{totalSteps.toLocaleString()}</p>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                     <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-xs font-bold">
+                       <Users size={12} /> {activeUserCount} Racers
+                     </div>
+                     <span>contributed</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Distance Covered</h3>
+                <p className="text-4xl font-normal text-gray-800 mt-2">{totalMiles.toFixed(1)} <span className="text-xl text-gray-400">mi</span></p>
+                <div className="mt-2 flex items-center text-sm text-gray-400">
+                   <span className="text-red-500 font-medium mr-1">Target:</span> {TOTAL_GOAL_MILES.toLocaleString()} mi
+                </div>
+              </div>
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-center">
+                <div className="flex justify-between items-end mb-3">
+                    <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Race Progress</h3>
+                    <span className="text-3xl font-normal text-green-600">{progressPercent.toFixed(2)}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div className="bg-[#34A853] h-3 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%` }}></div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const RaceMap = ({ progressPercentage, viewMode }) => {
+          const mapContainerRef = useRef(null);
+          const mapInstanceRef = useRef(null);
+          const markerRef = useRef(null);
+          const polylineRef = useRef(null);
+
+          const iconShoe = L.divIcon({
+            html: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#EA4335" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="white"/></svg>`,
+            className: 'drop-shadow-md',
+            iconSize: [40, 40],
+            iconAnchor: [20, 40],
+            popupAnchor: [0, -40]
+          });
+
+          useEffect(() => {
+            if (!mapContainerRef.current) return;
+            if (!mapInstanceRef.current) {
+              const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([39.8283, -98.5795], 4);
+              L.control.zoom({ position: 'bottomright' }).addTo(map);
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+              const latLngs = ROUTE_WAYPOINTS.map(wp => [wp.lat, wp.lng]);
+              polylineRef.current = L.polyline(latLngs, { color: '#4285F4', weight: 5, opacity: 0.8 }).addTo(map);
+              L.circleMarker([ROUTE_WAYPOINTS[0].lat, ROUTE_WAYPOINTS[0].lng], { color: '#34A853', fillColor: '#34A853', fillOpacity: 1, radius: 6 }).addTo(map).bindPopup("Start: Seattle");
+              L.circleMarker([ROUTE_WAYPOINTS[ROUTE_WAYPOINTS.length-1].lat, ROUTE_WAYPOINTS[ROUTE_WAYPOINTS.length-1].lng], { color: '#EA4335', fillColor: '#EA4335', fillOpacity: 1, radius: 6 }).addTo(map).bindPopup("Finish: NYC");
+              ROUTE_WAYPOINTS.slice(1, -1).forEach(wp => L.circleMarker([wp.lat, wp.lng], { color: '#FBBC05', fillColor: '#FBBC05', fillOpacity: 1, radius: 4 }).addTo(map).bindPopup(wp.name));
+              mapInstanceRef.current = map;
+            }
+          }, []);
+
+          useEffect(() => {
+            if (!mapInstanceRef.current) return;
+            const [lat, lng] = getPositionAtProgress(ROUTE_WAYPOINTS, progressPercentage);
+            const milesCovered = (progressPercentage * TOTAL_GOAL_MILES).toFixed(1);
+            const percentDisplay = (progressPercentage * 100).toFixed(2);
+            const popupContent = `<div class="text-center font-sans"><div class="font-bold text-gray-800 text-sm">Current Location</div><div class="text-xs text-gray-500 mt-1">${percentDisplay}% Complete</div><div class="text-sm font-bold text-[#4285F4] mt-1 border-t pt-1 border-gray-100">${milesCovered} miles</div></div>`;
+
+            if (markerRef.current) {
+              markerRef.current.setLatLng([lat, lng]);
+              markerRef.current.setPopupContent(popupContent);
+            } else {
+              markerRef.current = L.marker([lat, lng], { icon: iconShoe }).addTo(mapInstanceRef.current);
+              markerRef.current.bindPopup(popupContent);
+            }
+            if (viewMode === 'local') {
+              mapInstanceRef.current.flyTo([lat, lng], 13, { duration: 1.5 });
+              markerRef.current.openPopup();
+            } else {
+              mapInstanceRef.current.flyTo([39.8283, -98.5795], 4, { duration: 1.5 });
+              markerRef.current.closePopup();
+            }
+          }, [progressPercentage, viewMode]);
+
+          return <div ref={mapContainerRef} className="h-[450px] w-full rounded-2xl shadow-sm border border-gray-200 z-0 bg-white" />;
+        };
+
+        const Leaderboard = ({ users }) => {
+          const sortedUsers = [...users].sort((a, b) => (b.steps || 0) - (a.steps || 0));
+          const topLeaders = sortedUsers.slice(0, 5);
+          const chasers = sortedUsers.slice(5, 10);
+          
+          const getRankColor = (index) => {
+            switch (index) {
+              case 0: return 'bg-[#FBBC05] text-white';
+              case 1: return 'bg-[#9AA0A6] text-white';
+              case 2: return 'bg-[#E37400] text-white';
+              default: return 'bg-blue-50 text-blue-600';
+            }
+          };
+          const getDisplayName = (u) => u.teamName ? u.teamName : u.name;
+          const getSubtext = (u) => u.teamName ? u.name : null;
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Top 5 */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
+                    <div className="bg-yellow-100 p-2 rounded-full"><Award className="text-[#FBBC05]" size={20} /></div>
+                    <h2 className="text-lg font-normal text-gray-800">Leaderboard (Top 5)</h2>
+                </div>
+                {users.length === 0 ? <p className="text-gray-400 text-center italic py-4">Waiting for racers...</p> : (
+                  <ul className="space-y-4">
+                    {topLeaders.map((user, index) => (
+                      <li key={user.id} className="flex items-center justify-between group">
+                        <div className="flex items-center gap-4">
+                          <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${getRankColor(index)}`}>{index + 1}</span>
+                          <div><span className="text-gray-700 font-medium text-lg block leading-tight">{getDisplayName(user)}</span>{getSubtext(user) && <span className="text-xs text-gray-400">{getSubtext(user)}</span>}</div>
+                        </div>
+                        <span className="font-roboto text-gray-900 font-bold">{(user.steps || 0).toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              
+              {/* Next 5 (The Chase) */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-4">
+                    <div className="bg-blue-50 p-2 rounded-full"><TrendingUp className="text-[#4285F4]" size={20} /></div>
+                    <h2 className="text-lg font-normal text-gray-800">In The Hunt (6-10)</h2>
+                </div>
+                 {chasers.length === 0 ? <p className="text-gray-400 text-center italic py-4 text-sm">More racers needed to fill the ranks!</p> : (
+                  <ul className="space-y-4">
+                    {chasers.map((user, index) => (
+                      <li key={user.id} className="flex items-center justify-between opacity-90 hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-4">
+                          <span className="w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold bg-gray-100 text-gray-500">{index + 6}</span>
+                          <div><span className="text-gray-600 font-medium text-lg block leading-tight">{getDisplayName(user)}</span>{getSubtext(user) && <span className="text-xs text-gray-400">{getSubtext(user)}</span>}</div>
+                        </div>
+                        <span className="font-roboto text-gray-600 font-medium">{(user.steps || 0).toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          );
+        };
+
+        const TimeBasedLeaderboard = ({ users }) => {
+          const [viewMode, setViewMode] = useState('overall');
+          const weeksArray = Array.from({ length: TOTAL_WEEKS }, (_, i) => (i + 1).toString());
+          const calculateScore = (user) => viewMode === 'overall' ? (user.steps || 0) : (user.weeklySteps ? (user.weeklySteps[viewMode] || 0) : 0);
+          const leaders = users.map(user => ({ ...user, currentScore: calculateScore(user) })).sort((a, b) => b.currentScore - a.currentScore).slice(0, 5).filter(u => u.currentScore > 0);
+          const getDisplayName = (u) => u.teamName ? u.teamName : u.name;
+
+          return (
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full -mr-16 -mt-16 opacity-50" />
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 relative z-10 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-full ${viewMode === 'overall' ? 'bg-indigo-100 text-indigo-600' : 'bg-purple-100 text-purple-600'}`}>
+                     {viewMode === 'overall' ? <Zap size={24} /> : <Calendar size={24} />}
+                  </div>
+                  <div><h2 className="text-2xl font-normal text-gray-800">Momentum Tracker</h2><p className="text-gray-500 text-sm">{viewMode === 'overall' ? 'All-time race leaders' : `Top performers for Week ${viewMode}`}</p></div>
+                </div>
+                <div className="bg-gray-100 p-1.5 rounded-xl flex items-center relative">
+                  <select value={viewMode} onChange={(e) => setViewMode(e.target.value)} className="appearance-none bg-white text-gray-800 font-bold py-2 pl-4 pr-10 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm border-0">
+                    <option value="overall">🏆 Overall Leaders</option>
+                    {weeksArray.map(week => <option key={week} value={week}>📅 Week {week}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
+                {leaders.length === 0 ? <div className="col-span-full py-12 text-center text-gray-400"><Clock className="mx-auto mb-2 opacity-50"/>No activity recorded for this period.</div> : leaders.map((user, index) => (
+                  <div key={user.id} className={`flex flex-col items-center p-4 rounded-2xl border ${index === 0 ? 'bg-gradient-to-b from-white to-gray-50 border-gray-200 md:scale-105 z-10' : 'bg-white border-gray-100'}`}>
+                     {index === 0 && <div className="mb-2 bg-yellow-100 text-[#f59e0b] px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><TrendingUp size={12}/> LEADER</div>}
+                     <div className="mb-2"><div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : index === 1 ? 'bg-gray-200 text-gray-700' : index === 2 ? 'bg-orange-100 text-orange-700' : 'bg-blue-50 text-blue-600'}`}>#{index + 1}</div></div>
+                     <h3 className="font-bold text-gray-800 text-center leading-tight mb-1 truncate w-full">{getDisplayName(user)}</h3>
+                     <p className={`text-xl font-roboto font-bold ${viewMode === 'overall' ? 'text-indigo-600' : 'text-purple-600'}`}>{user.currentScore.toLocaleString()}</p>
+                     <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-medium">Steps</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        };
+
+        const WeeklyAnalytics = ({ users }) => {
+            const sortedUsers = useMemo(() => [...users].sort((a, b) => b.steps - a.steps), [users]);
+            const [selectedUserIds, setSelectedUserIds] = useState(() => {
+                const initial = new Set();
+                sortedUsers.slice(0, 5).forEach(u => initial.add(u.id));
+                return initial;
+            });
+            const [hoveredWeek, setHoveredWeek] = useState(null);
+            const toggleUser = (id) => {
+                const newSet = new Set(selectedUserIds);
+                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                setSelectedUserIds(newSet);
+            };
+            const getDisplayName = (u) => u.teamName ? u.teamName : u.name;
+            const CHART_COLORS = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8E24AA', '#00ACC1', '#F4511E', '#3949AB', '#D81B60', '#00897B'];
+            const weeks = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
+            const CHART_HEIGHT = 200, CHART_WIDTH = 800, PADDING_X = 40, PADDING_Y = 20;
+
+            const maxSteps = useMemo(() => {
+                let max = 10000;
+                users.forEach(u => {
+                    if (!selectedUserIds.has(u.id)) return;
+                    if (u.weeklySteps) Object.values(u.weeklySteps).forEach(val => { if (val > max) max = val; });
+                });
+                return Math.ceil(max / 5000) * 5000;
+            }, [users, selectedUserIds]);
+
+            const getX = (i) => PADDING_X + (i * ((CHART_WIDTH - PADDING_X * 2) / (TOTAL_WEEKS - 1)));
+            const getY = (v) => CHART_HEIGHT - PADDING_Y - ((v / maxSteps) * (CHART_HEIGHT - PADDING_Y * 2));
+            
+            const userPaths = useMemo(() => sortedUsers.map((user, index) => {
+                if (!selectedUserIds.has(user.id)) return null;
+                const points = weeks.map((week, idx) => {
+                    const steps = user.weeklySteps?.[week] || 0;
+                    if (steps <= 0) return null;
+                    return { x: getX(idx), y: getY(steps), value: steps, week };
+                }).filter(p => p !== null);
+                if (points.length === 0) return null;
+                const d = points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x},${pt.y}`).join(' ');
+                return { userId: user.id, color: CHART_COLORS[index % CHART_COLORS.length], d, points };
+            }).filter(p => p !== null), [sortedUsers, selectedUserIds, maxSteps]);
+
+            return (
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 mt-8">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="bg-orange-100 p-2 rounded-full text-orange-600"><BarChart2 size={24} /></div>
+                        <div><h2 className="text-2xl font-normal text-gray-800">Weekly Performance Analytics</h2></div>
+                    </div>
+                    <div className="relative w-full h-[250px] overflow-hidden">
+                        <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="w-full h-full font-sans text-xs select-none" preserveAspectRatio="none">
+                            {[0, 0.5, 1].map(pct => { const val = Math.round(maxSteps * pct); const y = getY(val); return <g key={pct}><line x1={PADDING_X} y1={y} x2={CHART_WIDTH - PADDING_X} y2={y} stroke="#f3f4f6" strokeWidth="1"/><text x={PADDING_X - 5} y={y + 4} textAnchor="end" fill="#9ca3af">{val >= 1000 ? `${val/1000}k` : val}</text></g>; })}
+                            {weeks.map((w, i) => <text key={w} x={getX(i)} y={CHART_HEIGHT - 5} textAnchor="middle" fill="#6b7280">W{w}</text>)}
+                            {userPaths.map(p => <path key={p.userId} d={p.d} fill="none" stroke={p.color} strokeWidth="2.5" className="transition-all" style={{opacity: hoveredWeek !== null ? 0.3 : 1}} />)}
+                            {userPaths.map(p => <g key={`pts-${p.userId}`}>{p.points.map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={hoveredWeek === pt.week ? 6 : 3} fill="white" stroke={p.color} strokeWidth="2" style={{opacity: hoveredWeek !== null && hoveredWeek !== pt.week ? 0.1 : 1}}/>)}</g>)}
+                            {weeks.map((w, i) => <rect key={`ov-${w}`} x={getX(i) - 20} y={0} width={40} height={CHART_HEIGHT} fill="transparent" className="cursor-crosshair hover:fill-gray-50/50" onMouseEnter={() => setHoveredWeek(w)} onMouseLeave={() => setHoveredWeek(null)}/>)}
+                        </svg>
+                        {hoveredWeek !== null && (
+                            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm border border-gray-200 p-4 rounded-xl shadow-lg z-10 min-w-[200px] animate-fade-in pointer-events-none">
+                                <h4 className="text-gray-500 text-xs font-bold uppercase mb-2">Week {hoveredWeek} Stats</h4>
+                                <div className="space-y-1">
+                                    {sortedUsers.filter(u => selectedUserIds.has(u.id) && u.weeklySteps?.[hoveredWeek]).map((u, i) => (
+                                        <div key={u.id} className="flex items-center justify-between text-sm">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CHART_COLORS[sortedUsers.findIndex(su => su.id === u.id) % CHART_COLORS.length] }} />
+                                                <span className="text-gray-700 font-medium truncate max-w-[100px]">{getDisplayName(u)}</span>
+                                            </div>
+                                            <span className="font-mono font-bold text-gray-900">{(u.weeklySteps[hoveredWeek] || 0).toLocaleString()}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-8 border-t border-gray-100 pt-6 flex flex-wrap gap-2">
+                        {sortedUsers.map((u, i) => {
+                            const isSelected = selectedUserIds.has(u.id);
+                            return <button key={u.id} onClick={() => toggleUser(u.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${isSelected ? 'bg-white border-gray-200 text-gray-800 shadow-sm' : 'bg-gray-50 border-transparent text-gray-400'}`}><div className={`w-2.5 h-2.5 rounded-full ${isSelected ? '' : 'bg-gray-300'}`} style={{ backgroundColor: isSelected ? CHART_COLORS[i % CHART_COLORS.length] : undefined }} />{getDisplayName(u)} {isSelected ? <Eye size={12}/> : <EyeOff size={12}/>}</button>;
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        const ICON_LIBRARY = [
+          { id: 'cat', icon: Cat, color: 'bg-orange-100 text-orange-600' },
+          { id: 'dog', icon: Dog, color: 'bg-amber-100 text-amber-700' },
+          { id: 'bird', icon: Bird, color: 'bg-sky-100 text-sky-600' },
+          { id: 'fish', icon: Fish, color: 'bg-blue-100 text-blue-600' },
+          { id: 'bug', icon: Bug, color: 'bg-lime-100 text-lime-600' },
+          { id: 'flower', icon: Flower, color: 'bg-pink-100 text-pink-600' },
+          { id: 'tree', icon: TreePine, color: 'bg-green-100 text-green-700' },
+          { id: 'sun', icon: Sun, color: 'bg-yellow-100 text-yellow-600' },
+          { id: 'moon', icon: Moon, color: 'bg-indigo-100 text-indigo-600' },
+          { id: 'cloud', icon: Cloud, color: 'bg-slate-100 text-slate-600' },
+          { id: 'fire', icon: Flame, color: 'bg-red-100 text-red-600' },
+          { id: 'water', icon: Droplets, color: 'bg-cyan-100 text-cyan-600' },
+          { id: 'zap', icon: Zap, color: 'bg-yellow-200 text-yellow-700' },
+          { id: 'star', icon: Star, color: 'bg-purple-100 text-purple-600' },
+          { id: 'heart', icon: Heart, color: 'bg-rose-100 text-rose-600' },
+          { id: 'trophy', icon: Trophy, color: 'bg-amber-200 text-amber-800' },
+          { id: 'crown', icon: Crown, color: 'bg-fuchsia-100 text-fuchsia-600' },
+          { id: 'smile', icon: Smile, color: 'bg-teal-100 text-teal-600' },
+          { id: 'ghost', icon: Ghost, color: 'bg-gray-200 text-gray-700' },
+          { id: 'rocket', icon: Rocket, color: 'bg-violet-100 text-violet-600' },
         ];
 
-        // --- 3. LEAFLET MAP SETUP ---
-        const map = L.map('map').setView([39.8283, -98.5795], 4);
-        
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
-            maxZoom: 19
-        }).addTo(map);
+        const AddStepsForm = ({ users, onAddSteps, onAddUser, onRemoveUser, onDeleteStep }) => {
+          const [selectedUserId, setSelectedUserId] = useState(null);
+          const [isCreatingUser, setIsCreatingUser] = useState(false);
+          const [stepInput, setStepInput] = useState('');
+          const [selectedWeek, setSelectedWeek] = useState(1);
+          const [newUserName, setNewUserName] = useState('');
+          const [newTeamName, setNewTeamName] = useState('');
+          const [selectedIconId, setSelectedIconId] = useState('smile');
 
-        // Draw Route
-        const routeCoords = waypoints.map(wp => wp.coords);
-        const routeLine = L.polyline(routeCoords, {
-            color: '#00f2ff',
-            weight: 4,
-            opacity: 0.7,
-            dashArray: '10, 10',
-            lineCap: 'round'
-        }).addTo(map);
+          const emptySlotsCount = Math.max(0, MAX_USERS - users.length);
+          const emptySlots = Array.from({ length: emptySlotsCount }, (_, i) => i);
+          const selectedUser = users.find(u => u.id === selectedUserId);
+          const weeksArray = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
 
-        // Group Progress Marker
-        const raceIcon = L.divIcon({
-            className: 'custom-div-icon',
-            html: "<div style='background-color:#00f2ff; width:12px; height:12px; border-radius:50%; box-shadow:0 0 10px #ffffff;'></div>",
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
-        });
+          const handleStepSubmit = (e) => { e.preventDefault(); if (selectedUserId && stepInput) { onAddSteps(selectedUserId, parseInt(stepInput), selectedWeek); setStepInput(''); } };
+          const handleCreateUser = (e) => { e.preventDefault(); if (newUserName && selectedIconId) { onAddUser(newUserName, newTeamName, selectedIconId); setNewUserName(''); setNewTeamName(''); setSelectedIconId('smile'); setIsCreatingUser(false); } };
+          const getIconComponent = (iconId) => { const config = ICON_LIBRARY.find(i => i.id === iconId) || ICON_LIBRARY[0]; const Icon = config.icon; return <div className={`p-3 rounded-full ${config.color}`}><Icon size={32} /></div>; };
+          const getDisplayName = (u) => u.teamName ? u.teamName : u.name;
 
-        const progressMarker = L.marker(waypoints[0].coords, {icon: raceIcon}).addTo(map);
-        progressMarker.bindPopup("<b>Start Line:</b> Seattle, WA");
+          return (
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm mt-8">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-gray-100 pb-6">
+                <div><h3 className="text-2xl font-normal text-gray-800">Team Roster</h3><p className="text-gray-500 mt-1">Select a racer to log <span className="font-bold text-gray-700">Weekly Steps</span>.</p></div>
+                {(selectedUserId || isCreatingUser) && <button onClick={() => { setSelectedUserId(null); setIsCreatingUser(false); }} className="flex items-center gap-2 text-gray-500 bg-gray-50 px-4 py-2 rounded-full"><X size={18} /> Cancel</button>}
+              </div>
 
-        // Add Landmark Circles
-        waypoints.forEach(wp => {
-            L.circleMarker(wp.coords, {
-                radius: 4,
-                color: '#334155',
-                fillColor: '#94a3b8',
-                fillOpacity: 1
-            }).addTo(map).bindPopup(wp.name);
-        });
+              {selectedUser && (
+                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-6 mb-8 relative animate-fade-in">
+                   <div className="flex flex-col md:flex-row items-center gap-6 mb-8">
+                     <div className="flex items-center gap-4 min-w-[200px]"><div className="transform scale-125">{getIconComponent(selectedUser.iconId)}</div><div><h4 className="text-xl font-bold text-gray-800">{getDisplayName(selectedUser)}</h4><p className="text-sm text-gray-500">{(selectedUser.steps || 0).toLocaleString()} total</p></div></div>
+                     <form onSubmit={handleStepSubmit} className="flex-1 w-full flex gap-3">
+                        <div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Calendar size={18} className="text-gray-400" /></div><select value={selectedWeek} onChange={(e) => setSelectedWeek(parseInt(e.target.value))} className="h-full bg-white border border-gray-200 text-gray-700 rounded-xl pl-10 pr-8 py-4 focus:ring-2 focus:ring-blue-500 outline-none">{weeksArray.map(week => <option key={week} value={week}>Week {week}</option>)}</select></div>
+                        <input type="number" value={stepInput} onChange={(e) => setStepInput(e.target.value)} placeholder="Steps..." className="flex-1 bg-white border border-gray-200 text-lg rounded-xl p-4 focus:ring-2 focus:ring-blue-500 outline-none" required min="1"/>
+                        <button type="submit" className="bg-[#4285F4] hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-medium flex items-center justify-center gap-2"><Check size={24} /> Log</button>
+                     </form>
+                   </div>
+                   <div className="bg-white rounded-xl border border-blue-100 overflow-hidden mb-6">
+                      <div className="px-4 py-3 bg-blue-100/30 flex items-center gap-2 border-b border-blue-100"><History size={16} className="text-blue-600" /><h5 className="text-xs font-bold text-blue-800 uppercase">Recent Entries</h5></div>
+                      <div className="max-h-48 overflow-y-auto">
+                         {(!selectedUser.stepHistory || selectedUser.stepHistory.length === 0) ? <div className="p-6 text-center text-gray-400 italic text-sm">No history logged yet.</div> : (
+                           <table className="w-full text-sm text-left"><tbody className="divide-y divide-gray-50">{[...selectedUser.stepHistory].reverse().map((entry, revIdx) => { const realIdx = selectedUser.stepHistory.length - 1 - revIdx; return <tr key={realIdx} className="hover:bg-blue-50/30"><td className="px-4 py-3 text-gray-500">{new Date(entry.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}</td><td className="px-4 py-3 text-gray-600">Week {entry.week || '?'}</td><td className="px-4 py-3 font-bold text-gray-800">+{(entry?.amount || 0).toLocaleString()}</td><td className="px-4 py-3 text-right"><button onClick={(e) => { e.preventDefault(); onDeleteStep(selectedUser.id, realIdx); }} className="text-red-300 hover:text-red-500"><Trash2 size={16}/></button></td></tr>; })}</tbody></table>
+                         )}
+                      </div>
+                   </div>
+                   <div className="pt-4 border-t border-blue-200/50 flex justify-end"><button onClick={() => onRemoveUser(selectedUser.id)} className="flex items-center gap-2 text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-bold border border-red-200"><Trash2 size={16}/> Delete Racer</button></div>
+                </div>
+              )}
 
-        map.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
+              {isCreatingUser && (
+                <form onSubmit={handleCreateUser} className="bg-green-50/50 border border-green-100 rounded-2xl p-6 mb-8 animate-fade-in">
+                   <div className="flex flex-col gap-6">
+                      <div className="flex flex-col md:flex-row gap-4"><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-2">1. Real Name</label><input type="text" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} className="w-full bg-white border border-gray-200 text-lg rounded-xl p-4 focus:ring-2 focus:ring-green-500 outline-none" required /></div><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-2">2. Team Name</label><input type="text" value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} className="w-full bg-white border border-gray-200 text-lg rounded-xl p-4 focus:ring-2 focus:ring-green-500 outline-none" /></div></div>
+                      <div className="flex flex-col md:flex-row gap-4"><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-3">3. Avatar</label><div className="grid grid-cols-5 gap-3">{ICON_LIBRARY.map(item => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => setSelectedIconId(item.id)} className={`aspect-square rounded-xl flex items-center justify-center transition-all ${selectedIconId === item.id ? 'bg-white ring-4 ring-green-400 shadow-md scale-110' : 'bg-white border border-gray-200 opacity-70'}`}><div className={`${item.color} p-2 rounded-full`}><Icon size={24} /></div></button> })}</div></div><div className="flex items-end"><button type="submit" className="bg-[#34A853] hover:bg-green-600 text-white px-8 py-4 rounded-xl font-medium w-full md:w-auto flex items-center justify-center gap-2"><UserPlus size={24} /> Join</button></div></div>
+                   </div>
+                </form>
+              )}
 
-        // --- 4. MATH & GEO LOGIC ---
-
-        function toRad(value) { return (value * Math.PI) / 180; }
-
-        function getDistKm(lat1, lon1, lat2, lon2) {
-            const R = 6371; // km
-            const dLat = toRad(lat2 - lat1);
-            const dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(toRad(lat1)) * Math.cos(toRad(lat2));
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
-        }
-
-        // Calculate total route distance in abstract units (using km for ratio calculation)
-        const segmentDistances = [];
-        let totalRouteDistKm = 0;
-        for(let i=0; i<waypoints.length-1; i++) {
-            const d = getDistKm(
-                waypoints[i].coords[0], waypoints[i].coords[1],
-                waypoints[i+1].coords[0], waypoints[i+1].coords[1]
-            );
-            segmentDistances.push(d);
-            totalRouteDistKm += d;
-        }
-
-        function updateMapPosition(totalSteps) {
-            const totalMiles = totalSteps / STEPS_PER_MILE;
-            const percentage = Math.min(totalMiles / TOTAL_GOAL_MILES, 1);
-            
-            // Update UI Stats
-            document.getElementById('totalMiles').innerText = Math.floor(totalMiles).toLocaleString();
-            document.getElementById('progressBar').style.width = (percentage * 100) + "%";
-
-            // Find Lat/Lng on Polyline
-            const targetDistKm = totalRouteDistKm * percentage;
-            let currentDistKm = 0;
-            let targetCoords = waypoints[waypoints.length-1].coords;
-            let nextCity = "New York City";
-
-            for(let i=0; i<segmentDistances.length; i++) {
-                if(currentDistKm + segmentDistances[i] >= targetDistKm) {
-                    const remaining = targetDistKm - currentDistKm;
-                    const ratio = remaining / segmentDistances[i];
-                    
-                    const lat1 = waypoints[i].coords[0];
-                    const lng1 = waypoints[i].coords[1];
-                    const lat2 = waypoints[i+1].coords[0];
-                    const lng2 = waypoints[i+1].coords[1];
-
-                    // Linear interpolation
-                    const lat = lat1 + (lat2 - lat1) * ratio;
-                    const lng = lng1 + (lng2 - lng1) * ratio;
-                    
-                    targetCoords = [lat, lng];
-                    nextCity = waypoints[i+1].name;
-                    break;
-                }
-                currentDistKm += segmentDistances[i];
-            }
-
-            // Update Marker
-            progressMarker.setLatLng(targetCoords);
-            progressMarker.setPopupContent(`<b>Current Location</b><br>${(percentage*100).toFixed(2)}% Complete`);
-            
-            document.getElementById('nextStop').innerText = nextCity;
-
-            // Auto-pan if view is far away
-            if(!map.getBounds().contains(targetCoords)) {
-                map.panTo(targetCoords);
-            }
-        }
-
-        // --- 5. FIREBASE LOGIC ---
-
-        // Listen for Realtime Updates
-        onSnapshot(collection(db, RACERS_COLLECTION), (snapshot) => {
-            let grandTotalSteps = 0;
-            let leaderboardData = [];
-
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                grandTotalSteps += (data.steps || 0);
-                leaderboardData.push({ id: doc.id, ...data });
-            });
-
-            // 1. Update Map
-            updateMapPosition(grandTotalSteps);
-
-            // 2. Update Leaderboard
-            leaderboardData.sort((a, b) => b.steps - a.steps);
-            const lbEl = document.getElementById('leaderboard');
-            lbEl.innerHTML = "";
-
-            leaderboardData.forEach((user, index) => {
-                const isPodium = index < 3;
-                const colorClass = isPodium ? "text-cyan-300 font-bold" : "text-slate-300";
-                const rankBadge = isPodium ? "👑" : `#${index + 1}`;
-                
-                const html = `
-                    <div class="flex justify-between items-center bg-slate-700/50 p-2 rounded hover:bg-slate-700 transition">
-                        <div class="flex items-center gap-2">
-                            <span class="w-6 text-center text-xs opacity-50">${rankBadge}</span>
-                            <span class="${colorClass}">${user.name}</span>
+              {!isCreatingUser && !selectedUser && (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {users.map((u) => {
+                    const primaryLabel = u.teamName ? u.teamName : u.name;
+                    const secondaryLabel = u.teamName ? u.name : null;
+                    return (
+                      <button key={u.id} onClick={() => setSelectedUserId(u.id)} className="group bg-white border border-gray-200 hover:border-blue-400 hover:shadow-lg rounded-2xl p-6 flex flex-col items-center justify-center transition-all gap-3 relative overflow-hidden">
+                        <div className="transform group-hover:scale-110 transition-transform duration-300">{getIconComponent(u.iconId)}</div>
+                        <div className="text-center w-full">
+                          <h4 className="font-bold text-gray-800 text-lg leading-tight truncate px-1">{primaryLabel}</h4>
+                          {secondaryLabel && (
+                              <p className="text-sm text-gray-500 font-medium mt-1 truncate px-1">{secondaryLabel}</p>
+                          )}
+                          <div className="mt-2">
+                             <span className="text-xs text-blue-600 font-bold bg-blue-50 px-3 py-1 rounded-full border border-blue-100">{(u.steps || 0).toLocaleString()} steps</span>
+                          </div>
                         </div>
-                        <span class="font-mono text-cyan-500/80">${user.steps.toLocaleString()}</span>
-                    </div>
-                `;
-                lbEl.insertAdjacentHTML('beforeend', html);
-            });
-        });
+                      </button>
+                    );
+                  })}
+                  {emptySlots.map((_, i) => <button key={`empty-${i}`} onClick={() => setIsCreatingUser(true)} className="group border-2 border-dashed border-gray-200 hover:border-green-400 hover:bg-green-50/30 rounded-2xl p-6 flex flex-col items-center justify-center transition-all gap-2 min-h-[180px]"><div className="w-16 h-16 rounded-full bg-gray-100 group-hover:bg-green-100 text-gray-400 group-hover:text-green-600 flex items-center justify-center"><Plus size={32} /></div><span className="text-sm font-bold text-gray-400 group-hover:text-green-600">Open Spot</span></button>)}
+                </div>
+              )}
+            </div>
+          );
+        };
 
-        // Submit Steps
-        document.getElementById('submitSteps').addEventListener('click', async () => {
-            const name = document.getElementById('userName').value.trim();
-            const steps = parseInt(document.getElementById('stepCount').value);
-            const statusEl = document.getElementById('statusMsg');
+        const ReportGenerator = ({ users, totalSteps }) => {
+            const [copied, setCopied] = useState(false);
+            const getDisplayName = (u) => u.teamName ? `${u.teamName} (${u.name})` : u.name;
+            const generateReport = () => {
+                const sorted = [...users].sort((a, b) => (b.steps || 0) - (a.steps || 0));
+                return `🏁 TEA&O AMAZING RACE UPDATE 🏁\n\n🌍 Distance: ${(totalSteps/STEPS_PER_MILE).toFixed(1)} miles\n📊 Progress: ${((totalSteps/TOTAL_GOAL_STEPS)*100).toFixed(2)}%\n\n🏆 LEADER:\n${sorted[0] ? `${getDisplayName(sorted[0])} (${(sorted[0].steps || 0).toLocaleString()} steps)` : 'N/A'}\n\n#TeaAndOAmazingRace`;
+            };
+            const handleCopy = () => { navigator.clipboard.writeText(generateReport()); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+            const downloadData = () => { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(users)); a.download = "race_data.json"; document.body.appendChild(a); a.click(); a.remove(); };
+            return <div className="flex flex-wrap gap-4 mt-8 justify-center"><button onClick={handleCopy} className="flex items-center gap-2 bg-[#4285F4] text-white px-6 py-2 rounded-full font-medium"><ClipboardCopy size={18}/> {copied ? 'Copied!' : 'Share'}</button><button onClick={downloadData} className="flex items-center gap-2 bg-white text-gray-700 px-6 py-2 rounded-full font-medium border border-gray-300"><Download size={18}/> Export</button></div>;
+        };
 
-            if(!name || isNaN(steps) || steps <= 0) {
-                alert("Please enter a valid name and step count.");
-                return;
-            }
+        // --- APP ---
+        const App = () => {
+            const [users, setUsers] = useState([]);
+            const [milestonesReached, setMilestonesReached] = useState([]);
+            const [activeNotification, setActiveNotification] = useState(null);
+            const [mapViewMode, setMapViewMode] = useState('global');
+            const [isOffline, setIsOffline] = useState(false);
+            const [connectionStatus, setConnectionStatus] = useState('connecting');
+            const [isResetting, setIsResetting] = useState(false);
 
-            try {
-                // Check if user exists to update, or create new
-                // For simplicity in this race, we use Name as ID (normalized)
-                const userId = name.toLowerCase().replace(/\s+/g, '-');
-                const userRef = doc(db, RACERS_COLLECTION, userId);
-                const docSnap = await getDoc(userRef);
+            const totalSteps = users.reduce((acc, user) => acc + (Number(user.steps) || 0), 0);
+            const progressPercentage = Math.min(totalSteps / TOTAL_GOAL_STEPS, 1);
 
-                if (docSnap.exists()) {
-                    await updateDoc(userRef, {
-                        steps: increment(steps),
-                        lastUpdated: serverTimestamp()
-                    });
-                } else {
-                    await setDoc(userRef, {
-                        name: name,
-                        steps: steps,
-                        joined: serverTimestamp()
-                    });
+            useEffect(() => {
+                const unsubscribe = api.subscribeToUsers((data, isOnline) => {
+                   setUsers(data);
+                   setConnectionStatus(isOnline ? 'live' : 'local');
+                   setIsOffline(!isOnline);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                const segmentSize = 1 / (ROUTE_WAYPOINTS.length - 1); 
+                ROUTE_WAYPOINTS.forEach((wp, index) => {
+                    const requiredProgress = index * segmentSize; 
+                    if (progressPercentage >= requiredProgress && index > 0 && !milestonesReached.includes(wp.name)) {
+                         setMilestonesReached(prev => [...prev, wp.name]);
+                         setActiveNotification(wp);
+                    }
+                });
+            }, [progressPercentage, milestonesReached]);
+
+            const handleAddSteps = async (userId, steps, week) => {
+                setUsers(prev => prev.map(u => u.id === userId ? { ...u, steps: u.steps + steps, weeklySteps: { ...u.weeklySteps, [week]: (u.weeklySteps[week] || 0) + steps }, stepHistory: [...(u.stepHistory || []), { amount: steps, date: new Date().toISOString(), week }] } : u));
+                await api.addSteps(userId, steps, week);
+            };
+
+            const handleDeleteStep = async (userId, idx) => {
+                 if (!window.confirm("Delete this entry?")) return;
+                 setUsers(prev => prev.map(u => {
+                   if (u.id !== userId) return u;
+                   const hist = [...(u.stepHistory || [])];
+                   const entry = hist[idx];
+                   if (!entry) return u;
+                   hist.splice(idx, 1);
+                   return { ...u, steps: Math.max(0, u.steps - entry.amount), weeklySteps: { ...u.weeklySteps, [entry.week]: Math.max(0, (u.weeklySteps[entry.week] || 0) - entry.amount) }, stepHistory: hist };
+                 }));
+                 await api.removeStepEntry(userId, idx);
+            };
+
+            const handleAddUser = async (name, teamName, iconId) => { if (users.length >= MAX_USERS) return; await api.addUser(name, teamName, iconId); };
+            const handleRemoveUser = async (userId) => { if (!window.confirm("Permanently delete racer?")) return; setUsers(prev => prev.filter(u => u.id !== userId)); await api.deleteUser(userId); };
+            const handleResetRace = async () => { 
+                if (window.prompt("Type 'DELETE ALL' to confirm full reset:")?.toUpperCase() === 'DELETE ALL') {
+                    setIsResetting(true);
+                    try { await api.resetRace(); setUsers([]); setTimeout(() => window.location.reload(), 500); } catch(e) { setIsResetting(false); }
                 }
+            };
 
-                document.getElementById('stepCount').value = '';
-                statusEl.innerText = `Added ${steps} steps for ${name}!`;
-                setTimeout(() => statusEl.innerText = '', 3000);
+            return (
+                <div className="min-h-screen bg-[#f8f9fa] text-gray-900 p-4 md:p-8 pb-32 font-sans">
+                  <div className="max-w-6xl mx-auto space-y-8">
+                    {isOffline && <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-gray-800 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 animate-bounce-in border border-gray-700"><CloudOff size={20} className="text-gray-400" /><span className="text-sm">Offline Mode</span><button onClick={() => api.retryConnection()} className="ml-2 bg-gray-700 px-3 py-1 rounded text-xs font-bold"><RefreshCw size={12} /> RETRY</button></div>}
+                    
+                    <header className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-6 gap-4 bg-white p-6 rounded-3xl shadow-sm border-0">
+                      <div><h1 className="text-3xl font-normal tracking-tight"><span className="text-[#4285F4] font-bold">Tea&O</span> <span className="text-[#EA4335]">Amazing</span> <span className="text-[#FBBC05]">Race</span></h1><p className="text-gray-500 mt-1 font-medium">Seattle to NYC • 4,195 Miles</p></div>
+                      {connectionStatus === 'live' && <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-full border border-green-100"><span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span><span className="text-sm font-bold text-[#34A853]">LIVE SYNC</span></div>}
+                      {connectionStatus === 'local' && <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full border border-gray-200"><CloudOff size={16} className="text-gray-500" /><span className="text-sm font-bold text-gray-500">OFFLINE</span></div>}
+                    </header>
 
-            } catch (error) {
-                console.error("Error adding steps: ", error);
-                alert("Error connecting to database. Check console.");
-            }
-        });
+                    {activeNotification && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+                        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl relative animate-bounce-in border border-gray-100">
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#FBBC05] text-white p-3 rounded-full shadow-md"><MapPin size={32} strokeWidth={2.5} /></div>
+                          <h2 className="text-2xl font-normal text-center mt-6 text-gray-800">Checkpoint Reached</h2>
+                          <h3 className="text-xl text-center text-[#4285F4] font-medium mt-1">{activeNotification.name}</h3>
+                          <p className="text-gray-600 text-center mt-4 text-lg leading-relaxed">{activeNotification.fact}</p>
+                          <button onClick={() => setActiveNotification(null)} className="w-full mt-8 bg-[#4285F4] hover:bg-blue-600 text-white font-medium py-3 rounded-full shadow-md">Continue</button>
+                        </div>
+                      </div>
+                    )}
 
+                    <DashboardStats totalSteps={totalSteps} activeUserCount={users.length} />
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm"><div className="flex justify-between items-center mb-4"><div><h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Live Route Map</h3></div><div className="flex bg-gray-100 p-1 rounded-xl"><button onClick={() => setMapViewMode('global')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${mapViewMode === 'global' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><Globe size={16} /> Route</button><button onClick={() => setMapViewMode('local')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${mapViewMode === 'local' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><Navigation size={16} /> Local</button></div></div><RaceMap progressPercentage={progressPercentage} viewMode={mapViewMode} /></div>
+                    <Leaderboard users={users} />
+                    <TimeBasedLeaderboard users={users} />
+                    <WeeklyAnalytics users={users} />
+                    <AddStepsForm users={users} onAddSteps={handleAddSteps} onAddUser={handleAddUser} onRemoveUser={handleRemoveUser} onDeleteStep={handleDeleteStep} />
+                    <ReportGenerator users={users} totalSteps={totalSteps} />
+
+                    <footer className="text-center text-gray-400 text-sm pt-12 pb-8">
+                       <p className="mb-4">© 2024 Tea&O • Internal Step Challenge</p>
+                       <button onClick={handleResetRace} disabled={isResetting} className="text-red-200 hover:text-red-500 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 mx-auto disabled:opacity-50">{isResetting ? <Loader2 size={12} className="animate-spin" /> : <AlertTriangle size={12} />} {isResetting ? 'Wiping Data...' : 'Admin Reset'}</button>
+                    </footer>
+                  </div>
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
