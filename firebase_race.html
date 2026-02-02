@@ -8,7 +8,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Google Fonts: Outfit is the closest free Google Font to 'Google Sans' -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,15 +16,14 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
-    <!-- Leaflet JS (Global) -->
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <!-- React & Babel -->
+    <!-- React 18 & Babel -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map for Modules -->
     <script type="importmap">
     {
       "imports": {
@@ -38,25 +37,14 @@
     </script>
 
     <style>
-        /* Force Outfit as the primary font to mimic Google Sans */
         body { font-family: 'Outfit', sans-serif; }
-        
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        
-        @keyframes bounceIn {
-            0% { transform: scale(0.9); opacity: 0; }
-            70% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(1); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bounceIn { 0% { transform: scale(0.9); opacity: 0; } 70% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
         .animate-bounce-in { animation: bounceIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
     </style>
 </head>
-<body class="bg-[#f8f9fa] text-gray-800 antialiased selection:bg-blue-100 selection:text-blue-700">
+<body class="bg-[#f8f9fa] text-gray-800 antialiased">
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
@@ -72,7 +60,7 @@
         import { initializeApp } from 'firebase/app';
         import { 
             getFirestore, collection, addDoc, updateDoc, deleteDoc, increment, 
-            arrayUnion, onSnapshot, serverTimestamp, getDocs, doc, getDoc, setDoc 
+            arrayUnion, onSnapshot, serverTimestamp, getDocs, doc, getDoc
         } from 'firebase/firestore';
 
         // --- CONSTANTS ---
@@ -132,7 +120,7 @@
             return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lng];
         }
 
-        // --- API & FIREBASE ---
+        // --- FIREBASE SETUP ---
         const firebaseConfig = {
           apiKey: "AIzaSyBscaY5kkaXkea9ZFoMeqYNvmCnVEVeTfs",
           authDomain: "tea-and-o-amazing-race.firebaseapp.com",
@@ -151,11 +139,11 @@
         let unsubscribeSnapshot = null;
         let isOfflineMode = false;
 
+        // --- DATA LAYER ---
         const getLocalUsers = () => {
           try {
             const data = localStorage.getItem(LOCAL_STORAGE_KEY);
             const users = data ? JSON.parse(data) : [];
-            // Sanitize data (robustness against bad entries)
             return users.map(u => ({
               ...u,
               steps: typeof u.steps === 'number' ? u.steps : 0,
@@ -619,189 +607,4 @@
           const weeksArray = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
 
           const handleStepSubmit = (e) => { e.preventDefault(); if (selectedUserId && stepInput) { onAddSteps(selectedUserId, parseInt(stepInput), selectedWeek); setStepInput(''); } };
-          const handleCreateUser = (e) => { e.preventDefault(); if (newUserName && selectedIconId) { onAddUser(newUserName, newTeamName, selectedIconId); setNewUserName(''); setNewTeamName(''); setSelectedIconId('smile'); setIsCreatingUser(false); } };
-          const getIconComponent = (iconId) => { const config = ICON_LIBRARY.find(i => i.id === iconId) || ICON_LIBRARY[0]; const Icon = config.icon; return <div className={`p-3 rounded-full ${config.color}`}><Icon size={32} /></div>; };
-          const getDisplayName = (u) => u.teamName ? u.teamName : u.name;
-
-          return (
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm mt-8">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-gray-100 pb-6">
-                <div><h3 className="text-2xl font-normal text-gray-800">Team Roster</h3><p className="text-gray-500 mt-1">Select a racer to log <span className="font-bold text-gray-700">Weekly Steps</span>.</p></div>
-                {(selectedUserId || isCreatingUser) && <button onClick={() => { setSelectedUserId(null); setIsCreatingUser(false); }} className="flex items-center gap-2 text-gray-500 bg-gray-50 px-4 py-2 rounded-full"><X size={18} /> Cancel</button>}
-              </div>
-
-              {selectedUser && (
-                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-6 mb-8 relative animate-fade-in">
-                   <div className="flex flex-col md:flex-row items-center gap-6 mb-8">
-                     <div className="flex items-center gap-4 min-w-[200px]"><div className="transform scale-125">{getIconComponent(selectedUser.iconId)}</div><div><h4 className="text-xl font-bold text-gray-800">{getDisplayName(selectedUser)}</h4><p className="text-sm text-gray-500">{(selectedUser.steps || 0).toLocaleString()} total</p></div></div>
-                     <form onSubmit={handleStepSubmit} className="flex-1 w-full flex gap-3">
-                        <div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Calendar size={18} className="text-gray-400" /></div><select value={selectedWeek} onChange={(e) => setSelectedWeek(parseInt(e.target.value))} className="h-full bg-white border border-gray-200 text-gray-700 rounded-xl pl-10 pr-8 py-4 focus:ring-2 focus:ring-blue-500 outline-none">{weeksArray.map(week => <option key={week} value={week}>Week {week}</option>)}</select></div>
-                        <input type="number" value={stepInput} onChange={(e) => setStepInput(e.target.value)} placeholder="Steps..." className="flex-1 bg-white border border-gray-200 text-lg rounded-xl p-4 focus:ring-2 focus:ring-blue-500 outline-none" required min="1"/>
-                        <button type="submit" className="bg-[#4285F4] hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-medium flex items-center justify-center gap-2"><Check size={24} /> Log</button>
-                     </form>
-                   </div>
-                   <div className="bg-white rounded-xl border border-blue-100 overflow-hidden mb-6">
-                      <div className="px-4 py-3 bg-blue-100/30 flex items-center gap-2 border-b border-blue-100"><History size={16} className="text-blue-600" /><h5 className="text-xs font-bold text-blue-800 uppercase">Recent Entries</h5></div>
-                      <div className="max-h-48 overflow-y-auto">
-                         {(!selectedUser.stepHistory || selectedUser.stepHistory.length === 0) ? <div className="p-6 text-center text-gray-400 italic text-sm">No history logged yet.</div> : (
-                           <table className="w-full text-sm text-left"><tbody className="divide-y divide-gray-50">{[...selectedUser.stepHistory].reverse().map((entry, revIdx) => { const realIdx = selectedUser.stepHistory.length - 1 - revIdx; return <tr key={realIdx} className="hover:bg-blue-50/30"><td className="px-4 py-3 text-gray-500">{new Date(entry.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}</td><td className="px-4 py-3 text-gray-600">Week {entry.week || '?'}</td><td className="px-4 py-3 font-bold text-gray-800">+{(entry?.amount || 0).toLocaleString()}</td><td className="px-4 py-3 text-right"><button onClick={(e) => { e.preventDefault(); onDeleteStep(selectedUser.id, realIdx); }} className="text-red-300 hover:text-red-500"><Trash2 size={16}/></button></td></tr>; })}</tbody></table>
-                         )}
-                      </div>
-                   </div>
-                   <div className="pt-4 border-t border-blue-200/50 flex justify-end"><button onClick={() => onRemoveUser(selectedUser.id)} className="flex items-center gap-2 text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-bold border border-red-200"><Trash2 size={16}/> Delete Racer</button></div>
-                </div>
-              )}
-
-              {isCreatingUser && (
-                <form onSubmit={handleCreateUser} className="bg-green-50/50 border border-green-100 rounded-2xl p-6 mb-8 animate-fade-in">
-                   <div className="flex flex-col gap-6">
-                      <div className="flex flex-col md:flex-row gap-4"><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-2">1. Real Name</label><input type="text" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} className="w-full bg-white border border-gray-200 text-lg rounded-xl p-4 focus:ring-2 focus:ring-green-500 outline-none" required /></div><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-2">2. Team Name</label><input type="text" value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} className="w-full bg-white border border-gray-200 text-lg rounded-xl p-4 focus:ring-2 focus:ring-green-500 outline-none" /></div></div>
-                      <div className="flex flex-col md:flex-row gap-4"><div className="flex-1"><label className="block text-sm font-bold text-gray-700 mb-3">3. Avatar</label><div className="grid grid-cols-5 gap-3">{ICON_LIBRARY.map(item => { const Icon = item.icon; return <button key={item.id} type="button" onClick={() => setSelectedIconId(item.id)} className={`aspect-square rounded-xl flex items-center justify-center transition-all ${selectedIconId === item.id ? 'bg-white ring-4 ring-green-400 shadow-md scale-110' : 'bg-white border border-gray-200 opacity-70'}`}><div className={`${item.color} p-2 rounded-full`}><Icon size={24} /></div></button> })}</div></div><div className="flex items-end"><button type="submit" className="bg-[#34A853] hover:bg-green-600 text-white px-8 py-4 rounded-xl font-medium w-full md:w-auto flex items-center justify-center gap-2"><UserPlus size={24} /> Join</button></div></div>
-                   </div>
-                </form>
-              )}
-
-              {!isCreatingUser && !selectedUser && (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {users.map((u) => {
-                    const primaryLabel = u.teamName ? u.teamName : u.name;
-                    const secondaryLabel = u.teamName ? u.name : null;
-                    return (
-                      <button key={u.id} onClick={() => setSelectedUserId(u.id)} className="group bg-white border border-gray-200 hover:border-blue-400 hover:shadow-lg rounded-2xl p-6 flex flex-col items-center justify-center transition-all gap-3 relative overflow-hidden">
-                        <div className="transform group-hover:scale-110 transition-transform duration-300">{getIconComponent(u.iconId)}</div>
-                        <div className="text-center w-full">
-                          <h4 className="font-bold text-gray-800 text-lg leading-tight truncate px-1">{primaryLabel}</h4>
-                          {secondaryLabel && (
-                              <p className="text-sm text-gray-500 font-medium mt-1 truncate px-1">{secondaryLabel}</p>
-                          )}
-                          <div className="mt-2">
-                             <span className="text-xs text-blue-600 font-bold bg-blue-50 px-3 py-1 rounded-full border border-blue-100">{(u.steps || 0).toLocaleString()} steps</span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {emptySlots.map((_, i) => <button key={`empty-${i}`} onClick={() => setIsCreatingUser(true)} className="group border-2 border-dashed border-gray-200 hover:border-green-400 hover:bg-green-50/30 rounded-2xl p-6 flex flex-col items-center justify-center transition-all gap-2 min-h-[180px]"><div className="w-16 h-16 rounded-full bg-gray-100 group-hover:bg-green-100 text-gray-400 group-hover:text-green-600 flex items-center justify-center"><Plus size={32} /></div><span className="text-sm font-bold text-gray-400 group-hover:text-green-600">Open Spot</span></button>)}
-                </div>
-              )}
-            </div>
-          );
-        };
-
-        const ReportGenerator = ({ users, totalSteps }) => {
-            const [copied, setCopied] = useState(false);
-            const getDisplayName = (u) => u.teamName ? `${u.teamName} (${u.name})` : u.name;
-            const generateReport = () => {
-                const sorted = [...users].sort((a, b) => (b.steps || 0) - (a.steps || 0));
-                return `🏁 TEA&O AMAZING RACE UPDATE 🏁\n\n🌍 Distance: ${(totalSteps/STEPS_PER_MILE).toFixed(1)} miles\n📊 Progress: ${((totalSteps/TOTAL_GOAL_STEPS)*100).toFixed(2)}%\n\n🏆 LEADER:\n${sorted[0] ? `${getDisplayName(sorted[0])} (${(sorted[0].steps || 0).toLocaleString()} steps)` : 'N/A'}\n\n#TeaAndOAmazingRace`;
-            };
-            const handleCopy = () => { navigator.clipboard.writeText(generateReport()); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-            const downloadData = () => { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(users)); a.download = "race_data.json"; document.body.appendChild(a); a.click(); a.remove(); };
-            return <div className="flex flex-wrap gap-4 mt-8 justify-center"><button onClick={handleCopy} className="flex items-center gap-2 bg-[#4285F4] text-white px-6 py-2 rounded-full font-medium"><ClipboardCopy size={18}/> {copied ? 'Copied!' : 'Share'}</button><button onClick={downloadData} className="flex items-center gap-2 bg-white text-gray-700 px-6 py-2 rounded-full font-medium border border-gray-300"><Download size={18}/> Export</button></div>;
-        };
-
-        // --- APP ---
-        const App = () => {
-            const [users, setUsers] = useState([]);
-            const [milestonesReached, setMilestonesReached] = useState([]);
-            const [activeNotification, setActiveNotification] = useState(null);
-            const [mapViewMode, setMapViewMode] = useState('global');
-            const [isOffline, setIsOffline] = useState(false);
-            const [connectionStatus, setConnectionStatus] = useState('connecting');
-            const [isResetting, setIsResetting] = useState(false);
-
-            const totalSteps = users.reduce((acc, user) => acc + (Number(user.steps) || 0), 0);
-            const progressPercentage = Math.min(totalSteps / TOTAL_GOAL_STEPS, 1);
-
-            useEffect(() => {
-                const unsubscribe = api.subscribeToUsers((data, isOnline) => {
-                   setUsers(data);
-                   setConnectionStatus(isOnline ? 'live' : 'local');
-                   setIsOffline(!isOnline);
-                });
-                return () => unsubscribe();
-            }, []);
-
-            useEffect(() => {
-                const segmentSize = 1 / (ROUTE_WAYPOINTS.length - 1); 
-                ROUTE_WAYPOINTS.forEach((wp, index) => {
-                    const requiredProgress = index * segmentSize; 
-                    if (progressPercentage >= requiredProgress && index > 0 && !milestonesReached.includes(wp.name)) {
-                         setMilestonesReached(prev => [...prev, wp.name]);
-                         setActiveNotification(wp);
-                    }
-                });
-            }, [progressPercentage, milestonesReached]);
-
-            const handleAddSteps = async (userId, steps, week) => {
-                setUsers(prev => prev.map(u => u.id === userId ? { ...u, steps: u.steps + steps, weeklySteps: { ...u.weeklySteps, [week]: (u.weeklySteps[week] || 0) + steps }, stepHistory: [...(u.stepHistory || []), { amount: steps, date: new Date().toISOString(), week }] } : u));
-                await api.addSteps(userId, steps, week);
-            };
-
-            const handleDeleteStep = async (userId, idx) => {
-                 if (!window.confirm("Delete this entry?")) return;
-                 setUsers(prev => prev.map(u => {
-                   if (u.id !== userId) return u;
-                   const hist = [...(u.stepHistory || [])];
-                   const entry = hist[idx];
-                   if (!entry) return u;
-                   hist.splice(idx, 1);
-                   return { ...u, steps: Math.max(0, u.steps - entry.amount), weeklySteps: { ...u.weeklySteps, [entry.week]: Math.max(0, (u.weeklySteps[entry.week] || 0) - entry.amount) }, stepHistory: hist };
-                 }));
-                 await api.removeStepEntry(userId, idx);
-            };
-
-            const handleAddUser = async (name, teamName, iconId) => { if (users.length >= MAX_USERS) return; await api.addUser(name, teamName, iconId); };
-            const handleRemoveUser = async (userId) => { if (!window.confirm("Permanently delete racer?")) return; setUsers(prev => prev.filter(u => u.id !== userId)); await api.deleteUser(userId); };
-            const handleResetRace = async () => { 
-                if (window.prompt("Type 'DELETE ALL' to confirm full reset:")?.toUpperCase() === 'DELETE ALL') {
-                    setIsResetting(true);
-                    try { await api.resetRace(); setUsers([]); setTimeout(() => window.location.reload(), 500); } catch(e) { setIsResetting(false); }
-                }
-            };
-
-            return (
-                <div className="min-h-screen bg-[#f8f9fa] text-gray-900 p-4 md:p-8 pb-32 font-sans">
-                  <div className="max-w-6xl mx-auto space-y-8">
-                    {isOffline && <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-gray-800 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-2 animate-bounce-in border border-gray-700"><CloudOff size={20} className="text-gray-400" /><span className="text-sm">Offline Mode</span><button onClick={() => api.retryConnection()} className="ml-2 bg-gray-700 px-3 py-1 rounded text-xs font-bold"><RefreshCw size={12} /> RETRY</button></div>}
-                    
-                    <header className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-6 gap-4 bg-white p-6 rounded-3xl shadow-sm border-0">
-                      <div><h1 className="text-3xl font-normal tracking-tight"><span className="text-[#4285F4] font-bold">Tea&O</span> <span className="text-[#EA4335]">Amazing</span> <span className="text-[#FBBC05]">Race</span></h1><p className="text-gray-500 mt-1 font-medium">Seattle to NYC • 4,195 Miles</p></div>
-                      {connectionStatus === 'live' && <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-full border border-green-100"><span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span><span className="text-sm font-bold text-[#34A853]">LIVE SYNC</span></div>}
-                      {connectionStatus === 'local' && <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full border border-gray-200"><CloudOff size={16} className="text-gray-500" /><span className="text-sm font-bold text-gray-500">OFFLINE</span></div>}
-                    </header>
-
-                    {activeNotification && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
-                        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl relative animate-bounce-in border border-gray-100">
-                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#FBBC05] text-white p-3 rounded-full shadow-md"><MapPin size={32} strokeWidth={2.5} /></div>
-                          <h2 className="text-2xl font-normal text-center mt-6 text-gray-800">Checkpoint Reached</h2>
-                          <h3 className="text-xl text-center text-[#4285F4] font-medium mt-1">{activeNotification.name}</h3>
-                          <p className="text-gray-600 text-center mt-4 text-lg leading-relaxed">{activeNotification.fact}</p>
-                          <button onClick={() => setActiveNotification(null)} className="w-full mt-8 bg-[#4285F4] hover:bg-blue-600 text-white font-medium py-3 rounded-full shadow-md">Continue</button>
-                        </div>
-                      </div>
-                    )}
-
-                    <DashboardStats totalSteps={totalSteps} activeUserCount={users.length} />
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm"><div className="flex justify-between items-center mb-4"><div><h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Live Route Map</h3></div><div className="flex bg-gray-100 p-1 rounded-xl"><button onClick={() => setMapViewMode('global')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${mapViewMode === 'global' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><Globe size={16} /> Route</button><button onClick={() => setMapViewMode('local')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${mapViewMode === 'local' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><Navigation size={16} /> Local</button></div></div><RaceMap progressPercentage={progressPercentage} viewMode={mapViewMode} /></div>
-                    <Leaderboard users={users} />
-                    <TimeBasedLeaderboard users={users} />
-                    <WeeklyAnalytics users={users} />
-                    <AddStepsForm users={users} onAddSteps={handleAddSteps} onAddUser={handleAddUser} onRemoveUser={handleRemoveUser} onDeleteStep={handleDeleteStep} />
-                    <ReportGenerator users={users} totalSteps={totalSteps} />
-
-                    <footer className="text-center text-gray-400 text-sm pt-12 pb-8">
-                       <p className="mb-4">© 2024 Tea&O • Internal Step Challenge</p>
-                       <button onClick={handleResetRace} disabled={isResetting} className="text-red-200 hover:text-red-500 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 mx-auto disabled:opacity-50">{isResetting ? <Loader2 size={12} className="animate-spin" /> : <AlertTriangle size={12} />} {isResetting ? 'Wiping Data...' : 'Admin Reset'}</button>
-                    </footer>
-                  </div>
-                </div>
-            );
-        };
-
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+          const handleCreateUser = (e) => {
