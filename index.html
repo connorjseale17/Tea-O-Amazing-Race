@@ -392,6 +392,59 @@
           return html`<div ref=${mapContainerRef} className="h-[450px] w-full rounded-2xl shadow-sm border border-gray-200 z-0 bg-white" />`;
         };
 
+        const DistanceLandmarks = ({ totalSteps }) => {
+          // 2000 steps per mile
+          const miles = totalSteps / STEPS_PER_MILE;
+          
+          const milestones = [
+              { miles: 26.2, label: "Marathon Distance", icon: Trophy, color: "text-yellow-600 bg-yellow-100", desc: "We've run a full 26.2 mile marathon! Or walked it. Still counts." },
+              { miles: 62, label: "Edge of Space", icon: Rocket, color: "text-indigo-600 bg-indigo-100", desc: "We've walked past the Kármán line (100km). We are officially astronauts." },
+              { miles: 277, label: "Grand Canyon Length", icon: TreePine, color: "text-orange-600 bg-orange-100", desc: "We've traversed the entire 277-mile length of the Grand Canyon." },
+              { miles: 500, label: "500 Miles (The Proclaimers)", icon: Zap, color: "text-blue-600 bg-blue-100", desc: "We would walk 500 miles, and we would walk 500 more..." },
+              { miles: 790, label: "Length of Italy", icon: Globe, color: "text-green-600 bg-green-100", desc: "We've walked the entire boot of Italy from the Alps to Sicily." },
+              { miles: 1500, label: "Great Barrier Reef", icon: Fish, color: "text-cyan-600 bg-cyan-100", desc: "We've covered the length of the world's largest coral reef system." },
+              { miles: 2159, label: "Diameter of the Moon", icon: Moon, color: "text-slate-600 bg-slate-100", desc: "We've walked the entire diameter of the Moon!" },
+              { miles: 2448, label: "Route 66", icon: Navigation, color: "text-red-600 bg-red-100", desc: "We've covered the historic Route 66 from Chicago to Los Angeles." },
+              { miles: 3000, label: "Atlantic Ocean Width", icon: Droplets, color: "text-blue-800 bg-blue-200", desc: "We've technically walked across the Atlantic Ocean (shortest width)." },
+              { miles: 4195, label: "The Finish Line", icon: Crown, color: "text-yellow-600 bg-yellow-100", desc: "WE MADE IT! SEATTLE TO NYC COMPLETED!" }
+          ];
+
+          const currentMilestone = [...milestones].reverse().find(m => miles >= m.miles) || 
+              { miles: 0, label: "The Starting Line", icon: MapPin, color: "text-gray-600 bg-gray-100", desc: "Every journey begins with a single step. Let's get moving!" };
+          
+          const nextMilestone = milestones.find(m => miles < m.miles);
+          const Icon = currentMilestone.icon;
+
+          return html`
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 mt-6 relative overflow-hidden">
+                   <div className="absolute top-0 right-0 p-8 opacity-5 transform translate-x-1/4 -translate-y-1/4">
+                       <${Icon} size=${200} />
+                   </div>
+                   
+                   <div className="flex flex-col sm:flex-row items-start gap-4 relative z-10">
+                       <div className=${`p-4 rounded-2xl ${currentMilestone.color} shrink-0`}>
+                           <${Icon} size=${32} />
+                       </div>
+                       <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Where are we?</span>
+                              <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold">${(miles).toLocaleString(undefined, {maximumFractionDigits: 1})} miles</span>
+                           </div>
+                           <h3 className="text-2xl font-bold text-gray-800 mb-2">${currentMilestone.label}</h3>
+                           <p className="text-gray-600 leading-relaxed max-w-xl text-sm md:text-base">${currentMilestone.desc}</p>
+                           
+                           ${nextMilestone && html`
+                              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2 text-sm text-gray-500">
+                                 <${TrendingUp} size=${16} className="text-gray-400"/>
+                                 <span>Next: <strong>${nextMilestone.label}</strong> in ${(nextMilestone.miles - miles).toLocaleString(undefined, {maximumFractionDigits: 0})} miles</span>
+                              </div>
+                           `}
+                       </div>
+                   </div>
+              </div>
+          `;
+        };
+
         const Leaderboard = ({ users }) => {
           const sortedUsers = [...users].sort((a, b) => (b.steps || 0) - (a.steps || 0));
           const topLeaders = sortedUsers.slice(0, 5);
@@ -779,6 +832,7 @@
 
                     <${DashboardStats} totalSteps=${totalSteps} activeUserCount=${users.length} />
                     <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm"><div className="flex justify-between items-center mb-4"><div><h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Live Route Map</h3></div><div className="flex bg-gray-100 p-1 rounded-xl"><button onClick=${() => setMapViewMode('global')} className=${`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${mapViewMode === 'global' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><${Globe} size=${16} /> Route</button><button onClick=${() => setMapViewMode('local')} className=${`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${mapViewMode === 'local' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><${Navigation} size=${16} /> Local</button></div></div><${RaceMap} progressPercentage=${progressPercentage} viewMode=${mapViewMode} /></div>
+                    <${DistanceLandmarks} totalSteps=${totalSteps} />
                     <${Leaderboard} users=${users} />
                     <${TimeBasedLeaderboard} users=${users} />
                     <${WeeklyAnalytics} users=${users} />
